@@ -1,0 +1,25 @@
+{
+   "Statement":[
+      {
+         "Action":[
+            "s3:List*",
+            "s3:Put*",
+            "s3:Get*",
+            "s3:DeleteObject",
+            "dynamodb:DescribeTable",
+            "dynamodb:Scan",
+            "dynamodb:Query",
+            "dynamodb:GetItem",
+            "dynamodb:BatchGetItem",
+            "dynamodb:UpdateTable",
+            "dynamodb:WriteItem",
+            "dynamodb:BatchWriteItem",
+            "cloudwatch:PutMetricData"
+         ],
+         "Effect":"Allow",
+         "Resource":[
+            "*"
+         ]
+      }
+   ]
+}
