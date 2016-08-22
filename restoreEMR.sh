@@ -6,13 +6,12 @@ CLUSTER_NAME=$2
 PROFILE=$3
 JSON_INPUT_DIR=$4
 S3LOCATION=$5
-
+CLUSTER_REGION=$6
 # Hard-codes (but can be changed here)
 RETRY_DELAY=10
-CLUSTER_REGION=us-west-2
 
 # Just vars
-INSTALL_DIR=/usr/local/dynamodb-emr
+INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 NEXTPHASE=0
 RETCODE=0
 
@@ -26,7 +25,7 @@ logMsg()
 
 usage()
 {
-        echo "Usage: restoreEMR app_name emr_cluster_name boto_profile_name json_input_directory S3_location_for_logs"
+        echo "Usage: restoreEMR app_name emr_cluster_name boto_profile_name json_input_directory S3_location_for_logs import_region"
 }
 
 pollCluster()
@@ -67,7 +66,7 @@ pollCluster()
         return $ERRORS
 }
 
-if [ $# != 5 ]; then
+if [ $# != 6 ]; then
         usage
         exit 1
 fi
@@ -118,7 +117,7 @@ if [ $NEXTPHASE == 1 ]; then
                             --visible-to-all-users                                                                 \
                             --output text                                                                          \
                             --region ${CLUSTER_REGION}                                                             \
-                            --profile ${PROFILE}) 
+                            --profile ${PROFILE})
 
                 logMsg "CLUSTERID for ${CLUSTER_NAME} is $CLUSTERID"
                 # Now use the waiter to make sure the cluster is launched successfully

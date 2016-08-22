@@ -8,14 +8,17 @@ TABLE_FILTER=$4
 READ_TPUT=$5
 JSON_OUTPUT_DIR=$6
 S3LOCATION=$7
+SOURCE_REGION=$8
+DESTINATION_REGION=$9
+WRITE_CAPACITY=${10}
 
 # Hard-codes (but can be changed here)
-WRITE_TPUT=0.8		# Used when we generate the Import steps
-REGION=us-east-1
+WRITE_TPUT=1		# Used when we generate the Import steps
+
 RETRY_DELAY=10
 
 # Just vars
-INSTALL_DIR=/usr/local/dynamodb-emr
+INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 COMMON_JSON=${INSTALL_DIR}/common-json
 STEP_PRODUCER=${INSTALL_DIR}/produce-steps-json.py
 NEXTPHASE=0
@@ -40,7 +43,7 @@ logMsg()
 
 usage()
 {
-        echo "Usage: invokeEMR app_name emr_cluster_name boto_profile_name table_filter read_throughput_percentage json_output_directory S3_location"
+        echo "Usage: invokeEMR app_name emr_cluster_name boto_profile_name table_filter read_throughput_percentage json_output_directory S3_location export_region import_region write_capacity"
 }
 
 pollCluster()
@@ -56,12 +59,12 @@ pollCluster()
 
         while [ $COMPLETE -ne 1 ]
         do
-                CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --profile $PROFILE |jq -r '.["Cluster"]["Status"]["State"]')
+                CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --profile $PROFILE --region ${SOURCE_REGION} |jq -r '.["Cluster"]["Status"]["State"]')
                 #echo "STATUS IS $CLUSTER_STATUS"
 
                 if [ "${CLUSTER_STATUS}" == "TERMINATED" ]; then
                         # We now need to check if there were step errors
-                        STEPS_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --profile $PROFILE | jq -r '.["Cluster"]["Status"]["StateChangeReason"]["Message"]')
+                        STEPS_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --profile $PROFILE --region ${SOURCE_REGION} | jq -r '.["Cluster"]["Status"]["StateChangeReason"]["Message"]')
 
                         if [ "${STEPS_STATUS}" == "Steps completed with errors" ]; then
                                 ERRORS=1
@@ -81,7 +84,7 @@ pollCluster()
         return $ERRORS
 }
 
-if [ $# != 7 ]; then
+if [ $# != 10 ]; then
         usage
         exit 1
 fi
@@ -90,7 +93,7 @@ logMsg "Starting up"
 ######
 ## PHASE 1 - See if there are any clusters already runing with our name.  If there are, exit
 ######
-aws emr list-clusters --active --profile ${PROFILE} | grep -q ${CLUSTER_NAME}
+aws emr list-clusters --active --profile ${PROFILE} --region ${SOURCE_REGION} | grep -q ${CLUSTER_NAME}
 STATUS=$?
 
 if [ $STATUS == 0 ]; then
@@ -138,9 +141,9 @@ fi
 ######
 if [ $NEXTPHASE == 1 ]; then
         # PHASE 2 - Get the EMR steps file for the tables to backup
-        logMsg "Generating JSON files (R:${REGION} READ:${READ_TPUT} WRITE:${WRITE_TPUT} FILT:${TABLE_FILTER} JDIR:${JSON_OUTPUT_DIR} S3DIR:${S3LOCATION}"
+        logMsg "Generating JSON files (R:${SOURCE_REGION} READ:${READ_TPUT} WRITE:${WRITE_TPUT} FILT:${TABLE_FILTER} JDIR:${JSON_OUTPUT_DIR} S3DIR:${S3LOCATION}"
 
-        ${STEP_PRODUCER} -a ${APPNAME} -p ${PROFILE} -r ${REGION} -e ${READ_TPUT} -w ${WRITE_TPUT} -f ${TABLE_FILTER} ${JSON_OUTPUT_DIR} ${S3LOCATION}
+        ${STEP_PRODUCER} -a ${APPNAME} -p ${PROFILE} -r ${SOURCE_REGION} -i ${DESTINATION_REGION} -e ${READ_TPUT} -w ${WRITE_TPUT} -c ${WRITE_CAPACITY} -f ${TABLE_FILTER} ${JSON_OUTPUT_DIR} ${S3LOCATION}
         RESULT=$?
         if [ $RESULT == 0 ]; then
                 NEXTPHASE=1
@@ -192,7 +195,7 @@ if [ $NEXTPHASE == 1 ]; then
 
                 CLUSTERID=$(aws emr create-cluster --name "${CLUSTER_NAME}"                                        \
                             --ami-version 3.8.0                                                                    \
-                            --service-role "EMR_DefaultRole"                                                       \
+                            --service-role "EMR_CloneRole"                                                       \
                             --tags Name=${CLUSTER_NAME} signiant:product=devops signiant:email=devops@signiant.com \
                             --enable-debugging                                                                     \
                             --log-uri ${S3LOCATION}/emr-logs                                                       \
@@ -204,13 +207,14 @@ if [ $NEXTPHASE == 1 ]; then
                             --auto-terminate                                                                       \
                             --visible-to-all-users                                                                 \
                             --output text                                                                          \
-                            --profile ${PROFILE})
+                            --profile ${PROFILE}                                                                    \
+                            --region ${SOURCE_REGION})
 
                 logMsg "CLUSTERID for ${CLUSTER_NAME} is $CLUSTERID"
                 # Now use the waiter to make sure the cluster is launched successfully
                 if [ "$CLUSTERID" != "" ]; then
                         logMsg "Waiting for cluster NAME:${CLUSTER_NAME} ID:${CLUSTERID} to start...."
-                        aws emr wait cluster-running --cluster-id ${CLUSTERID} --profile ${PROFILE}
+                        aws emr wait cluster-running --cluster-id ${CLUSTERID} --profile ${PROFILE} --region ${SOURCE_REGION}
                         STATUS=$?
 
                         if [ $STATUS == 0 ]; then
@@ -240,7 +244,7 @@ if [ $NEXTPHASE == 1 ]; then
 
                 # First tag the backup as in progress so any downstream processes know not to copy this
                 logMsg "Writing BACKUP_RUNNING_LOCK file for this backup"
-                aws s3 cp ${BACKUP_RUNNING_LOCK_LOCAL_FILE} ${S3_BACKUP_BASE}/${BACKUP_RUNNING_LOCK_NAME} --profile ${PROFILE}
+                aws s3 cp ${BACKUP_RUNNING_LOCK_LOCAL_FILE} ${S3_BACKUP_BASE}/${BACKUP_RUNNING_LOCK_NAME} --profile ${PROFILE} --region ${SOURCE_REGION}
 
                 pollCluster $PROFILE $CLUSTERID $CLUSTER_NAME
                 STATUS=$?
@@ -251,14 +255,14 @@ if [ $NEXTPHASE == 1 ]; then
                         # Copy the steps json files to S3 so we have a copy for 'this' job
                         if [ "${S3_BACKUP_BASE}" != "" ]; then
                                 logMsg "Copying steps files to S3"
-                                aws s3 cp ${JSON_OUTPUT_DIR}/exportSteps.json ${S3_BACKUP_BASE}/exportSteps.json --profile ${PROFILE}
-                                aws s3 cp ${JSON_OUTPUT_DIR}/importSteps.json ${S3_BACKUP_BASE}/importSteps.json --profile ${PROFILE}
+                                aws s3 cp ${JSON_OUTPUT_DIR}/exportSteps.json ${S3_BACKUP_BASE}/exportSteps.json --profile ${PROFILE} --region ${SOURCE_REGION}
+                                aws s3 cp ${JSON_OUTPUT_DIR}/importSteps.json ${S3_BACKUP_BASE}/importSteps.json --profile ${PROFILE} --region ${SOURCE_REGION}
 
                                 logMsg "Removing the BACKUP_RUNNING_LOCK file for this backup"
-                                aws s3 rm ${S3_BACKUP_BASE}/${BACKUP_RUNNING_LOCK_NAME} --profile ${PROFILE}
+                                aws s3 rm ${S3_BACKUP_BASE}/${BACKUP_RUNNING_LOCK_NAME} --profile ${PROFILE} --region ${SOURCE_REGION}
 
                                 logMsg "Writing the BACKUP_COMPLETE_SUCCESS file for this backup"
-                                aws s3 cp ${BACKUP_COMPLETE_SUCCESS_LOCK_LOCAL_FILE} ${S3_BACKUP_BASE}/${BACKUP_COMPLETE_SUCCESS_LOCK_NAME} --profile ${PROFILE}
+                                aws s3 cp ${BACKUP_COMPLETE_SUCCESS_LOCK_LOCAL_FILE} ${S3_BACKUP_BASE}/${BACKUP_COMPLETE_SUCCESS_LOCK_NAME} --profile ${PROFILE} --region ${SOURCE_REGION}
                         else
                                 logMsg "No S3 base location for this backup specified - unable to copy steps files to S3"
                         fi
@@ -268,10 +272,10 @@ if [ $NEXTPHASE == 1 ]; then
                         logMsg "Cluster ERROR:task failure NAME:${CLUSTER_NAME} ID:${CLUSTERID}"
 
                         logMsg "Removing the BACKUP_RUNNING_LOCK file for this backup"
-                        aws s3 rm ${S3_BACKUP_BASE}/${BACKUP_RUNNING_LOCK_NAME} --profile ${PROFILE}
+                        aws s3 rm ${S3_BACKUP_BASE}/${BACKUP_RUNNING_LOCK_NAME} --profile ${PROFILE} --region ${SOURCE_REGION}
 
                         logMsg "Writing the BACKUP_COMPLETE_FAILED file for this backup"
-                        aws s3 cp ${BACKUP_COMPLETE_FAILED_LOCK_LOCAL_FILE} ${S3_BACKUP_BASE}/${BACKUP_COMPLETE_FAILED_LOCK_NAME} --profile ${PROFILE}
+                        aws s3 cp ${BACKUP_COMPLETE_FAILED_LOCK_LOCAL_FILE} ${S3_BACKUP_BASE}/${BACKUP_COMPLETE_FAILED_LOCK_NAME} --profile ${PROFILE} --region ${SOURCE_REGION}
 
                         RETCODE=4
                 fi

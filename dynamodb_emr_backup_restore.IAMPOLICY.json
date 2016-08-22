@@ -6,6 +6,7 @@
             "s3:Put*",
             "s3:Get*",
             "s3:DeleteObject",
+            "dynamodb:CreateTable",
             "dynamodb:DescribeTable",
             "dynamodb:Scan",
             "dynamodb:Query",

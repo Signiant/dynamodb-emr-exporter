@@ -62,6 +62,14 @@ parser.add_argument(
 )
 
 parser.add_argument(
+  '-c',
+  '--writecapacity',
+  type=str,
+  default="500",
+  help="The temporary write capacity to use when importing the table (def: 500)."
+)
+
+parser.add_argument(
   '-f',
   '--filter',
   type=str,
@@ -98,7 +106,7 @@ def myLog(message):
   syslog.syslog(syslogMsg)
   print '%s %s' % (dateTimeStr,message)
 
-def main(region,filter,destination,impregion,writetput,readtput,s3location,profile,appname):
+def main(region,filter,destination,impregion,writetput,writecapacity,readtput,s3location,profile,appname):
 
   retCode = 0
   dateStr = datetime.datetime.now().strftime("%Y/%m/%d/%H_%M.%S")
@@ -124,6 +132,9 @@ def main(region,filter,destination,impregion,writetput,readtput,s3location,profi
     # Get the path we will use for 'this' backup
     s3ExportPath = generateS3Path(s3location,region,dateStr,appname)
 
+    #Set the path for the table-clone scripts and jar
+    s3ClonePath = s3location + "/clone"
+
     S3PathFilename = destination + "/s3path.info"
     writeFile(s3ExportPath,S3PathFilename)
 
@@ -137,8 +148,14 @@ def main(region,filter,destination,impregion,writetput,readtput,s3location,profi
         tableExportStep = generateTableExportStep(table_name,tableS3Path,readtput,region)
         exportSteps.append(tableExportStep)
 
+        tableCloneStep = generateTableCloneStep(table_name, region, impregion, writecapacity, s3ClonePath)
+        importSteps.append(tableCloneStep)
+
         tableImportStep = generateTableImportStep(table_name,tableS3Path,writetput,impregion)
         importSteps.append(tableImportStep)
+
+        tableResetStep = generateTableResetStep(table_name, region, impregion, s3ClonePath)
+        importSteps.append(tableResetStep)
 
     # Now we can write out the import and export steps files
     exportJSON = json.dumps(exportSteps,indent=4)
@@ -148,6 +165,29 @@ def main(region,filter,destination,impregion,writetput,readtput,s3location,profi
     importJSON = json.dumps(importSteps,indent=4)
     importJSONFilename = destination + "/importSteps.json"
     writeFile(importJSON,importJSONFilename)
+
+###########
+## Add a JSON entry for a single table clone step
+###########
+def generateTableCloneStep(tableName, sourceRegion, destinationRegion, writeCapacity, s3ClonePath):
+    myLog("addTableCloneStep %s" % tableName)
+
+    tableCloneDict = {}
+    ## ** TODO: What to do about path for jar and sh
+    tableCloneDict = {"Name": "Clone Table:" + tableName,
+                      "ActionOnFailure": "CONTINUE",
+                      "Type": "CUSTOM_JAR",
+                      "Jar": "s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
+                      "Args": [
+                        s3ClonePath + "/clone.sh",
+                        sourceRegion,
+                        destinationRegion,
+                        tableName,
+                        writeCapacity,
+                        s3ClonePath + "/table-clone.jar"
+                      ]
+    }
+    return tableCloneDict;
 
 ###########
 ## Add a JSON entry for a single table export step
@@ -162,13 +202,32 @@ def generateTableExportStep(tableName,s3Path,readtput,endpoint):
                      "Jar":"s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar",
                      "Args":["org.apache.hadoop.dynamodb.tools.DynamoDbExport",
                              s3Path,
-                             tableName, 
-                             readtput, 
+                             tableName,
+                             readtput,
                             ]
                     }
 
   return tableExportDict
 
+###########
+## Add a JSON entry for a single table reset step
+###########
+def generateTableResetStep(tableName, sourceRegion, destinationRegion, s3ClonePath):
+    myLog("addTableResetStep %s" % tableName)
+
+    tableResetDict = {}
+    tableResetDict = {"Name": "Reset Table:" + tableName,
+                       "ActionOnFailure": "CONTINUE",
+                       "Type": "CUSTOM_JAR",
+                       "Jar": "s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
+                       "Args": [ s3ClonePath + "/reset.sh",
+                                sourceRegion,
+                                destinationRegion,
+                                tableName,
+                                s3ClonePath + "/table-clone.jar"
+                               ]
+                     }
+    return tableResetDict
 
 ###########
 ## Add a JSON entry for a single table import step
