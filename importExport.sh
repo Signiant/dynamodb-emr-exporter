@@ -39,9 +39,4 @@ if [ $RETCODE -eq 0 ]; then
   fi
 fi
 
-if [ $RETCODE -eq 0 ]; then
-  echo "Deleting s3 backup"
-  aws s3 rm --recursive $S3LOCATION/$SOURCE_REGION
-fi
-
 exit $RETCODE
