@@ -6,10 +6,10 @@ CLUSTER_NAME=$2
 PROFILE=$3
 JSON_INPUT_DIR=$4
 S3LOCATION=$5
+CLUSTER_REGION=$6
 
 # Hard-codes (but can be changed here)
 RETRY_DELAY=10
-CLUSTER_REGION=us-west-2
 
 # Just vars
 INSTALL_DIR=/usr/local/dynamodb-emr
@@ -26,7 +26,7 @@ logMsg()
 
 usage()
 {
-        echo "Usage: restoreEMR app_name emr_cluster_name boto_profile_name json_input_directory S3_location_for_logs"
+        echo "Usage: restoreEMR app_name emr_cluster_name boto_profile_name json_input_directory S3_location_for_logs cluster_region"
 }
 
 pollCluster()
@@ -38,7 +38,7 @@ pollCluster()
         COMPLETE=0
         ERRORS=0
 
-        logMsg "polling cluster NAME:${CLUSTERNAME} ID ${CLUSTERID} for status in profile ${PROFILE}"
+        logMsg "polling cluster NAME:${CLUSTERNAME} ID ${CLUSTERID} for status in region ${CLUSTER_REGION} as profile ${PROFILE}"
 
         while [ $COMPLETE -ne 1 ]
         do
@@ -67,7 +67,7 @@ pollCluster()
         return $ERRORS
 }
 
-if [ $# != 5 ]; then
+if [ $# != 6 ]; then
         usage
         exit 1
 fi
@@ -76,7 +76,7 @@ logMsg "Starting up"
 ######
 ## PHASE 1 - See if there are any clusters already runing with our name.  If there are, exit
 ######
-aws emr list-clusters --active --profile ${PROFILE} --region $CLUSTER_REGION | grep -q ${CLUSTER_NAME}
+aws emr list-clusters --active --profile ${PROFILE} --region ${CLUSTER_REGION} | grep -q ${CLUSTER_NAME}
 STATUS=$?
 
 if [ $STATUS == 0 ]; then
@@ -118,7 +118,7 @@ if [ $NEXTPHASE == 1 ]; then
                             --visible-to-all-users                                                                 \
                             --output text                                                                          \
                             --region ${CLUSTER_REGION}                                                             \
-                            --profile ${PROFILE}) 
+                            --profile ${PROFILE})
 
                 logMsg "CLUSTERID for ${CLUSTER_NAME} is $CLUSTERID"
                 # Now use the waiter to make sure the cluster is launched successfully

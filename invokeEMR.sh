@@ -8,10 +8,11 @@ TABLE_FILTER=$4
 READ_TPUT=$5
 JSON_OUTPUT_DIR=$6
 S3LOCATION=$7
+REGION=$8
+IMPORT_REGION=$9
 
 # Hard-codes (but can be changed here)
 WRITE_TPUT=0.8		# Used when we generate the Import steps
-REGION=us-east-1
 RETRY_DELAY=10
 
 # Just vars
@@ -40,7 +41,7 @@ logMsg()
 
 usage()
 {
-        echo "Usage: invokeEMR app_name emr_cluster_name boto_profile_name table_filter read_throughput_percentage json_output_directory S3_location"
+        echo "Usage: invokeEMR app_name emr_cluster_name boto_profile_name table_filter read_throughput_percentage json_output_directory S3_location export_region import_region"
 }
 
 pollCluster()
@@ -52,16 +53,16 @@ pollCluster()
         COMPLETE=0
         ERRORS=0
 
-        logMsg "polling cluster NAME:${CLUSTERNAME} ID ${CLUSTERID} for status in profile ${PROFILE}"
+        logMsg "polling cluster NAME:${CLUSTERNAME} ID ${CLUSTERID} for status in region ${REGION} as profile ${PROFILE}"
 
         while [ $COMPLETE -ne 1 ]
         do
-                CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --profile $PROFILE |jq -r '.["Cluster"]["Status"]["State"]')
+                CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --region $REGION --profile $PROFILE |jq -r '.["Cluster"]["Status"]["State"]')
                 #echo "STATUS IS $CLUSTER_STATUS"
 
                 if [ "${CLUSTER_STATUS}" == "TERMINATED" ]; then
                         # We now need to check if there were step errors
-                        STEPS_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --profile $PROFILE | jq -r '.["Cluster"]["Status"]["StateChangeReason"]["Message"]')
+                        STEPS_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --region $REGION --profile $PROFILE | jq -r '.["Cluster"]["Status"]["StateChangeReason"]["Message"]')
 
                         if [ "${STEPS_STATUS}" == "Steps completed with errors" ]; then
                                 ERRORS=1
@@ -81,7 +82,7 @@ pollCluster()
         return $ERRORS
 }
 
-if [ $# != 7 ]; then
+if [ $# != 9 ]; then
         usage
         exit 1
 fi
@@ -90,7 +91,7 @@ logMsg "Starting up"
 ######
 ## PHASE 1 - See if there are any clusters already runing with our name.  If there are, exit
 ######
-aws emr list-clusters --active --profile ${PROFILE} | grep -q ${CLUSTER_NAME}
+aws emr list-clusters --active --region ${REGION} --profile ${PROFILE} | grep -q ${CLUSTER_NAME}
 STATUS=$?
 
 if [ $STATUS == 0 ]; then
@@ -138,9 +139,9 @@ fi
 ######
 if [ $NEXTPHASE == 1 ]; then
         # PHASE 2 - Get the EMR steps file for the tables to backup
-        logMsg "Generating JSON files (R:${REGION} READ:${READ_TPUT} WRITE:${WRITE_TPUT} FILT:${TABLE_FILTER} JDIR:${JSON_OUTPUT_DIR} S3DIR:${S3LOCATION}"
+        logMsg "Generating JSON files (R:${REGION} I: ${IMPORT_REGION} READ:${READ_TPUT} WRITE:${WRITE_TPUT} FILT:${TABLE_FILTER} JDIR:${JSON_OUTPUT_DIR} S3DIR:${S3LOCATION}"
 
-        ${STEP_PRODUCER} -a ${APPNAME} -p ${PROFILE} -r ${REGION} -e ${READ_TPUT} -w ${WRITE_TPUT} -f ${TABLE_FILTER} ${JSON_OUTPUT_DIR} ${S3LOCATION}
+        ${STEP_PRODUCER} -a ${APPNAME} -p ${PROFILE} -r ${REGION} -i ${IMPORT_REGION} -e ${READ_TPUT} -w ${WRITE_TPUT} -f ${TABLE_FILTER} ${JSON_OUTPUT_DIR} ${S3LOCATION}
         RESULT=$?
         if [ $RESULT == 0 ]; then
                 NEXTPHASE=1
@@ -199,18 +200,19 @@ if [ $NEXTPHASE == 1 ]; then
                             --applications file://${JSON_OUTPUT_DIR}/applications.json                             \
                             --instance-groups file://${JSON_OUTPUT_DIR}/instance-groups.json                       \
                             --ec2-attributes file://${JSON_OUTPUT_DIR}/ec2-attributes.json                         \
-                            --bootstrap-actions file://${JSON_OUTPUT_DIR}/bootstrap-actions-export.json                   \
+                            --bootstrap-actions file://${JSON_OUTPUT_DIR}/bootstrap-actions-export.json            \
                             --steps file://${JSON_OUTPUT_DIR}/exportSteps.json                                     \
                             --auto-terminate                                                                       \
                             --visible-to-all-users                                                                 \
                             --output text                                                                          \
+                            --region ${REGION}                                                                     \
                             --profile ${PROFILE})
 
                 logMsg "CLUSTERID for ${CLUSTER_NAME} is $CLUSTERID"
                 # Now use the waiter to make sure the cluster is launched successfully
                 if [ "$CLUSTERID" != "" ]; then
                         logMsg "Waiting for cluster NAME:${CLUSTER_NAME} ID:${CLUSTERID} to start...."
-                        aws emr wait cluster-running --cluster-id ${CLUSTERID} --profile ${PROFILE}
+                        aws emr wait cluster-running --cluster-id ${CLUSTERID} --region ${REGION} --profile ${PROFILE}
                         STATUS=$?
 
                         if [ $STATUS == 0 ]; then
