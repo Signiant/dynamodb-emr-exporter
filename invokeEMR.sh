@@ -15,7 +15,7 @@ WRITE_TPUT=0.8		# Used when we generate the Import steps
 RETRY_DELAY=10
 
 # Just vars
-INSTALL_DIR=/usr/local/dynamodb-emr
+INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 COMMON_JSON=${INSTALL_DIR}/common-json
 STEP_PRODUCER=${INSTALL_DIR}/produce-steps-json.py
 NEXTPHASE=0
@@ -203,7 +203,7 @@ if [ $NEXTPHASE == 1 ]; then
                             --auto-terminate                                                                       \
                             --visible-to-all-users                                                                 \
                             --output text                                                                          \
-                            --region ${REGION})                                                                     
+                            --region ${REGION})
 
                 logMsg "CLUSTERID for ${CLUSTER_NAME} is $CLUSTERID"
                 # Now use the waiter to make sure the cluster is launched successfully
