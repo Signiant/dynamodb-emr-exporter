@@ -3,10 +3,9 @@
 # Inputs
 APPNAME=$1
 CLUSTER_NAME=$2
-PROFILE=$3
-JSON_INPUT_DIR=$4
-S3LOCATION=$5
-CLUSTER_REGION=$6
+JSON_INPUT_DIR=$3
+S3LOCATION=$4
+CLUSTER_REGION=$5
 
 # Hard-codes (but can be changed here)
 RETRY_DELAY=10
@@ -26,28 +25,27 @@ logMsg()
 
 usage()
 {
-        echo "Usage: restoreEMR app_name emr_cluster_name boto_profile_name json_input_directory S3_location_for_logs cluster_region"
+        echo "Usage: restoreEMR app_name emr_cluster_name json_input_directory S3_location_for_logs cluster_region"
 }
 
 pollCluster()
 {
-        PROFILE=$1
-        CLUSTERID=$2
-        CLUSTERNAME=$3
+        CLUSTERID=$1
+        CLUSTERNAME=$2
 
         COMPLETE=0
         ERRORS=0
 
-        logMsg "polling cluster NAME:${CLUSTERNAME} ID ${CLUSTERID} for status in region ${CLUSTER_REGION} as profile ${PROFILE}"
+        logMsg "polling cluster NAME:${CLUSTERNAME} ID ${CLUSTERID} for status in region ${CLUSTER_REGION}"
 
         while [ $COMPLETE -ne 1 ]
         do
-                CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --profile $PROFILE --region $CLUSTER_REGION |jq -r '.["Cluster"]["Status"]["State"]')
+                CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --region $CLUSTER_REGION |jq -r '.["Cluster"]["Status"]["State"]')
                 #echo "STATUS IS $CLUSTER_STATUS"
 
                 if [ "${CLUSTER_STATUS}" == "TERMINATED" ]; then
                         # We need to check if there were step errors
-                        STEPS_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --profile $PROFILE --region $CLUSTER_REGION | jq -r '.["Cluster"]["Status"]["StateChangeReason"]["Message"]')
+                        STEPS_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --region $CLUSTER_REGION | jq -r '.["Cluster"]["Status"]["StateChangeReason"]["Message"]')
 
                         if [ "${STEPS_STATUS}" == "Steps completed with errors" ]; then
                                 ERRORS=1
@@ -76,7 +74,7 @@ logMsg "Starting up"
 ######
 ## PHASE 1 - See if there are any clusters already runing with our name.  If there are, exit
 ######
-aws emr list-clusters --active --profile ${PROFILE} --region ${CLUSTER_REGION} | grep -q ${CLUSTER_NAME}
+aws emr list-clusters --active --region ${CLUSTER_REGION} | grep -q ${CLUSTER_NAME}
 STATUS=$?
 
 if [ $STATUS == 0 ]; then
@@ -117,14 +115,13 @@ if [ $NEXTPHASE == 1 ]; then
                             --auto-terminate                                                                       \
                             --visible-to-all-users                                                                 \
                             --output text                                                                          \
-                            --region ${CLUSTER_REGION}                                                             \
-                            --profile ${PROFILE})
+                            --region ${CLUSTER_REGION} )
 
                 logMsg "CLUSTERID for ${CLUSTER_NAME} is $CLUSTERID"
                 # Now use the waiter to make sure the cluster is launched successfully
                 if [ "$CLUSTERID" != "" ]; then
                         logMsg "Waiting for cluster NAME:${CLUSTER_NAME} ID:${CLUSTERID} to start...."
-                        aws emr wait cluster-running --cluster-id ${CLUSTERID} --profile ${PROFILE} --region ${CLUSTER_REGION}
+                        aws emr wait cluster-running --cluster-id ${CLUSTERID} --region ${CLUSTER_REGION}
                         STATUS=$?
 
                         if [ $STATUS == 0 ]; then
@@ -152,7 +149,7 @@ if [ $NEXTPHASE == 1 ]; then
         if [ $CLUSTERUP == 1 ]; then
                 # We have a cluster provisioned...now we can poll it's tasks and make sure it completes ok
 
-                pollCluster $PROFILE $CLUSTERID $CLUSTER_NAME
+                pollCluster $CLUSTERID $CLUSTER_NAME
                 STATUS=$?
 
                 if [ $STATUS == 0 ]; then

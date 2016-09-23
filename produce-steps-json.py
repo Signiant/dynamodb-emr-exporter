@@ -70,14 +70,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-  '-p',
-  '--profile',
-  type=str,
-  default="dev",
-  help="profile name in ~.boto to use for AWS authentication."
-)
-
-parser.add_argument(
   'destination',
   type=str,
   help="where to place the EMR export and import steps files"
@@ -98,12 +90,12 @@ def myLog(message):
   syslog.syslog(syslogMsg)
   print '%s %s' % (dateTimeStr,message)
 
-def main(region,filter,destination,impregion,writetput,readtput,s3location,profile,appname):
+def main(region,filter,destination,impregion,writetput,readtput,s3location,appname):
 
   retCode = 0
   dateStr = datetime.datetime.now().strftime("%Y/%m/%d/%H_%M.%S")
 
-  conn = boto.dynamodb2.connect_to_region(region,profile_name=profile)
+  conn = boto.dynamodb2.connect_to_region(region)
 
   if conn:
     myLog("connected to dynamodb (region: %s)" % region)
@@ -162,8 +154,8 @@ def generateTableExportStep(tableName,s3Path,readtput,endpoint):
                      "Jar":"s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar",
                      "Args":["org.apache.hadoop.dynamodb.tools.DynamoDbExport",
                              s3Path,
-                             tableName, 
-                             readtput, 
+                             tableName,
+                             readtput,
                             ]
                     }
 
