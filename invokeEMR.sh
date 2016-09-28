@@ -80,7 +80,7 @@ pollCluster()
         return $ERRORS
 }
 
-if [ $# != 9 ]; then
+if [ $# != 8 ]; then
         usage
         exit 1
 fi
