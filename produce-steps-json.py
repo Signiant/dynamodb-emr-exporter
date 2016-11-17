@@ -62,6 +62,14 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '-s',
+    '--spikedread',
+    type=str,
+    default="1000",
+    help="The value to spike read throughput to before table export"
+)
+
+parser.add_argument(
   '-f',
   '--filter',
   type=str,
@@ -90,7 +98,7 @@ def myLog(message):
   syslog.syslog(syslogMsg)
   print '%s %s' % (dateTimeStr,message)
 
-def main(region,filter,destination,impregion,writetput,readtput,s3location,appname):
+def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3location,appname):
 
   retCode = 0
   dateStr = datetime.datetime.now().strftime("%Y/%m/%d/%H_%M.%S")
@@ -112,24 +120,34 @@ def main(region,filter,destination,impregion,writetput,readtput,s3location,appna
 
     # get a list of all tables in the region
     table_list = listTables(conn)
+    table_desc_list = describeTables(conn, table_list)
 
     # Get the path we will use for 'this' backup
     s3ExportPath = generateS3Path(s3location,region,dateStr,appname)
+
+    # Get the path to the update-throughput script
+    s3ScriptPath = s3location.rstrip('/') + "/scripts/update-throughput.sh"
 
     S3PathFilename = destination + "/s3path.info"
     writeFile(s3ExportPath,S3PathFilename)
 
     # Now process them, ignoring any that don't match our filter
-    for table_name in table_list:
-      if filter in table_name:
-        myLog("Generating EMR export JSON for table: [%s]" %table_name)
+    for table in table_desc_list:
+      if filter in table['name']:
+        myLog("Generating EMR export JSON for table: [%s]" %table['name'])
 
-        tableS3Path = s3ExportPath + "/" + table_name
+        tableS3Path = s3ExportPath + "/" + table['name']
 
-        tableExportStep = generateTableExportStep(table_name,tableS3Path,readtput,region)
+        tputSpikeStep = generateThroughputUpdateStep(table['name'], "Spike", s3ScriptPath, spikedread, table['write'], region)
+        exportSteps.append(tputSpikeStep)
+
+        tableExportStep = generateTableExportStep(table['name'],tableS3Path,readtput,region)
         exportSteps.append(tableExportStep)
 
-        tableImportStep = generateTableImportStep(table_name,tableS3Path,writetput,impregion)
+        tputResetStep = generateThroughputUpdateStep(table['name'], "Reset", s3ScriptPath, table['read'], table['write'], region)
+        exportSteps.append(tputResetStep)
+
+        tableImportStep = generateTableImportStep(table['name'],tableS3Path,writetput,impregion)
         importSteps.append(tableImportStep)
 
     # Now we can write out the import and export steps files
@@ -140,6 +158,27 @@ def main(region,filter,destination,impregion,writetput,readtput,s3location,appna
     importJSON = json.dumps(importSteps,indent=4)
     importJSONFilename = destination + "/importSteps.json"
     writeFile(importJSON,importJSONFilename)
+
+###########
+## Add a JSON entry for a single table throughput update step
+###########
+def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, writetput, region):
+    myLog("addThroughputUpdateStep %s" % tableName)
+
+    tputUpdateDict = {}
+    tputUpdateDict = { "Name": stepName + " Throughput: " + tableName,
+                        "ActionOnFailure": "CONTINUE",
+                        "Type": "CUSTOM_JAR",
+                        "Jar": "s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
+                        "Args": [s3Path,
+                            region,
+                            tableName,
+                            readtput,
+                            writetput
+                            ]
+                    }
+
+    return tputUpdateDict
 
 ###########
 ## Add a JSON entry for a single table export step
@@ -223,6 +262,21 @@ def generateS3Path(basePath,region,dateStr,appname):
   myLog("S3 path generated is %s" % s3Path)
 
   return s3Path
+
+
+def describeTables(conn, table_list):
+    table_list_return = []
+
+    for table in table_list:
+        table_desc = conn.describe_table(table)
+        table_return = dict()
+        table_return['name'] = table
+        table_return['read'] = str(table_desc['Table']['ProvisionedThroughput']['ReadCapacityUnits'])
+        table_return['write'] = str(table_desc['Table']['ProvisionedThroughput']['WriteCapacityUnits'])
+        table_list_return.append(table_return)
+
+    return table_list_return
+
 
 ###########
 ## Obtain a list of dynamoDB tables from the current region
