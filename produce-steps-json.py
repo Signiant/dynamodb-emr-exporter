@@ -65,7 +65,6 @@ parser.add_argument(
     '-s',
     '--spikedread',
     type=str,
-    default="1000",
     help="The value to spike read throughput to before table export"
 )
 
@@ -137,15 +136,16 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
         myLog("Generating EMR export JSON for table: [%s]" %table['name'])
 
         tableS3Path = s3ExportPath + "/" + table['name']
-
-        tputSpikeStep = generateThroughputUpdateStep(table['name'], "Spike", s3ScriptPath, spikedread, table['write'], region)
-        exportSteps.append(tputSpikeStep)
+        if spikedread is not None:
+            tputSpikeStep = generateThroughputUpdateStep(table['name'], "Spike", s3ScriptPath, spikedread, table['write'], region)
+            exportSteps.append(tputSpikeStep)
 
         tableExportStep = generateTableExportStep(table['name'],tableS3Path,readtput,region)
         exportSteps.append(tableExportStep)
 
-        tputResetStep = generateThroughputUpdateStep(table['name'], "Reset", s3ScriptPath, table['read'], table['write'], region)
-        exportSteps.append(tputResetStep)
+        if spikedread is not None:
+            tputResetStep = generateThroughputUpdateStep(table['name'], "Reset", s3ScriptPath, table['read'], table['write'], region)
+            exportSteps.append(tputResetStep)
 
         tableImportStep = generateTableImportStep(table['name'],tableS3Path,writetput,impregion)
         importSteps.append(tableImportStep)

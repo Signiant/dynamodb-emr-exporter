@@ -9,9 +9,8 @@ JSON_OUTPUT_DIR=$5
 S3LOCATION=$6
 REGION=$7
 IMPORT_REGION=$8
+SPIKED_THROUGHPUT=$9
 
-# Hard-codes (but can be changed here)
-SPIKED_THROUGHPUT=1000
 WRITE_TPUT=0.8		# Used when we generate the Import steps
 RETRY_DELAY=10
 
@@ -42,7 +41,7 @@ logMsg()
 
 usage()
 {
-        echo "Usage: invokeEMR app_name emr_cluster_name table_filter read_throughput_percentage json_output_directory S3_location export_region import_region"
+        echo "Usage: invokeEMR app_name emr_cluster_name table_filter read_throughput_percentage json_output_directory S3_location export_region import_region [spiked_throughput]"
 }
 
 pollCluster()
@@ -82,7 +81,7 @@ pollCluster()
         return $ERRORS
 }
 
-if [ $# != 8 ]; then
+if [ $# != 8 ] && [ $# != 9 ]; then
         usage
         exit 1
 fi
@@ -157,7 +156,10 @@ if [ $NEXTPHASE == 1 ]; then
         # PHASE 2 - Get the EMR steps file for the tables to backup
         logMsg "Generating JSON files (R:${REGION} I: ${IMPORT_REGION} READ:${READ_TPUT} WRITE:${WRITE_TPUT} FILT:${TABLE_FILTER} JDIR:${JSON_OUTPUT_DIR} S3DIR:${S3LOCATION}"
 
-        ${STEP_PRODUCER} -a ${APPNAME} -r ${REGION} -i ${IMPORT_REGION} -e ${READ_TPUT} -w ${WRITE_TPUT} -f ${TABLE_FILTER} -s ${SPIKED_THROUGHPUT} ${JSON_OUTPUT_DIR} ${S3LOCATION}
+        if [ -n "${SPIKED_THROUGHPUT}" ]; then
+          SPIKE_ARG="-s ${SPIKED_THROUGHPUT}"
+        fi
+        ${STEP_PRODUCER} -a ${APPNAME} -r ${REGION} -i ${IMPORT_REGION} -e ${READ_TPUT} -w ${WRITE_TPUT} -f ${TABLE_FILTER} ${SPIKE_ARG} ${JSON_OUTPUT_DIR} ${S3LOCATION}
         RESULT=$?
         if [ $RESULT == 0 ]; then
                 NEXTPHASE=1
