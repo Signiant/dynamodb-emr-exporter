@@ -26,9 +26,12 @@ fi
 # wait for the table to finish updating
 while [ $ATTEMPTS -le $MAX_ATTEMPTS ]; do
   TABLE_STATUS=$(aws dynamodb describe-table --region $SOURCE_REGION --table-name $TABLE_NAME --query 'Table.TableStatus' --output text)
+  echo "Checking table status, attempt ${ATTEMPT}"
   if [ "$TABLE_STATUS" == "ACTIVE" ]; then
+    echo "Table transition successful"
     exit 0
   fi
+  echo "Table is $TABLE_STATUS, checking again in $SLEEP_SECONDS seconds"
   (( ATTEMPTS++ ))
   sleep $SLEEP_SECONDS
 done
