@@ -17,8 +17,13 @@ fi
 
 
 #Update the table throughput
-TABLE_STATUS=$(aws dynamodb update-table --region $SOURCE_REGION --table-name $TABLE_NAME --provisioned-throughput ReadCapacityUnits=${READ_CAPACITY},WriteCapacityUnits=${WRITE_CAPACITY} --query 'Table.TableStatus' --output text)
+TABLE_STATUS=$(aws dynamodb update-table --region $SOURCE_REGION --table-name $TABLE_NAME --provisioned-throughput ReadCapacityUnits=${READ_CAPACITY},WriteCapacityUnits=${WRITE_CAPACITY} --query 'Table.TableStatus' --output text 2>&1)
 if [ $? -ne 0 ]; then
+  ERROR_TYPE=$(echo $TABLE_STATUS | cut -d \( -f2 | cut -d \) -f1)
+  if [ "$ERROR_TYPE" == "ValidationException" ]; then
+    echo "Provisioned throughput already set, no action taken"
+    exit 0
+  fi
   echo "Unable to spike throughput"
   exit 1
 fi
