@@ -1,3 +1,4 @@
 {
-  "InstanceProfile": "dynamodb_emr_backup_restore"
+  "InstanceProfile": "dynamodb_emr_backup_restore",
+  "AvailabilityZone": "us-east-1a"
 }
