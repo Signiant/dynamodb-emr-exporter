@@ -64,7 +64,12 @@ pollCluster()
                         STEPS_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --region $REGION  | jq -r '.["Cluster"]["Status"]["StateChangeReason"]["Message"]')
 
                         if [ "${STEPS_STATUS}" == "Steps completed with errors" ]; then
-                                ERRORS=1
+                                EXPORT_FAILS=$(aws emr list-steps --step-states FAILED --cluster-id $CLUSTERID --region $REGION | jq -r '[.Steps[].Name | startswith("Export Table:")] | any')
+                                if [ "${EXPORT_FAILS}" == "true" ]; then
+                                  ERRORS=1
+                                else
+                                  ERRORS=0
+                                fi
                         else
                                 ERRORS=0
                         fi
