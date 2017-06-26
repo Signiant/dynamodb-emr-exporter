@@ -3,12 +3,14 @@
     "InstanceCount": 1,
     "Name": "Master",
     "InstanceGroupType": "MASTER",
-    "InstanceType": "m1.xlarge"
+    "InstanceType": "m1.xlarge",
+    "BidPrice" : "0.350"
   },
   {
     "InstanceCount": 1,
     "Name": "Workers",
     "InstanceGroupType": "CORE",
-    "InstanceType": "m1.xlarge"
+    "InstanceType": "m1.xlarge",
+    "BidPrice" : "0.350"
   }
 ]
