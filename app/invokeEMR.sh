@@ -1,15 +1,19 @@
 #!/bin/bash
 
+if [ "$DEBUG_OUTPUT" ]; then
+    echo "DEBUG Output selected"
+    set -x
+fi
+
 # Inputs
 APPNAME=$1
 CLUSTER_NAME=$2
 TABLE_FILTER=$3
 READ_TPUT=$4
-JSON_OUTPUT_DIR=$5
-S3LOCATION=$6
-REGION=$7
-IMPORT_REGION=$8
-SPIKED_THROUGHPUT=$9
+S3LOCATION=$5
+REGION=$6
+IMPORT_REGION=$7
+SPIKED_THROUGHPUT=$8
 
 WRITE_TPUT=0.8		# Used when we generate the Import steps
 RETRY_DELAY=10
@@ -19,6 +23,7 @@ INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 COMMON_JSON=${INSTALL_DIR}/common-json
 STEP_PRODUCER=${INSTALL_DIR}/produce-steps-json.py
 THROUGHPUT_SCRIPT=${INSTALL_DIR}/update-throughput.sh
+JSON_OUTPUT_DIR=${INSTALLDIR}/${TABLE_FILTER}
 NEXTPHASE=0
 RETCODE=0
 
@@ -56,16 +61,16 @@ pollCluster()
 
         while [ $COMPLETE -ne 1 ]
         do
-                CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --region $REGION |jq -r '.["Cluster"]["Status"]["State"]')
+                CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --region $REGION --output text --query 'Cluster.Status.State')
                 #echo "STATUS IS $CLUSTER_STATUS"
 
                 if [ "${CLUSTER_STATUS}" == "TERMINATED" ]; then
                         # We now need to check if there were step errors
-                        STEPS_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --region $REGION  | jq -r '.["Cluster"]["Status"]["StateChangeReason"]["Message"]')
+                        STEPS_STATUS=$(aws emr describe-cluster --cluster-id $CLUSTERID --region $REGION --output text --query 'Cluster.Status.StateChangeReason.Message')
 
                         if [ "${STEPS_STATUS}" == "Steps completed with errors" ]; then
-                                EXPORT_FAILS=$(aws emr list-steps --step-states FAILED --cluster-id $CLUSTERID --region $REGION | jq -r '[.Steps[].Name | startswith("Export Table:")] | any')
-                                if [ "${EXPORT_FAILS}" == "true" ]; then
+                                EXPORT_FAILS=$(aws emr list-steps --step-states FAILED --cluster-id $CLUSTERID --region $REGION --output text --query 'Steps[?starts_with(Name, `Export Table:`) == `true`]|[].Name')
+                                if [ ! -z "${EXPORT_FAILS}" ]; then
                                   ERRORS=1
                                 else
                                   ERRORS=0
@@ -86,7 +91,7 @@ pollCluster()
         return $ERRORS
 }
 
-if [ $# != 8 ] && [ $# != 9 ]; then
+if [ $# != 7 ] && [ $# != 8 ]; then
         usage
         exit 1
 fi

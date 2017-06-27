@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ "$DEBUG_OUTPUT" ]; then
+    echo "DEBUG Output selected"
+    set -x
+fi
+
 # Inputs
 APPNAME=$1
 CLUSTER_NAME=$2

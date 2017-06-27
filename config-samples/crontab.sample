@@ -1,0 +1,3 @@
+
+# Backup the dynamoDB tables
+20 17 * * * /usr/local/signiant/dynamodb-emr-exporter/invokeEMR.sh MYAPP DynamoDB_Exporter_MYAPP MY_TABLE_PREFIX 0.70 /usr/local/signiant/dynamodb-emr-exporter/myapp s3://my-bucket/dynamodb/emr-backups us-east-1 us-west-2 1000
