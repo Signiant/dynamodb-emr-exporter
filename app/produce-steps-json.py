@@ -9,9 +9,7 @@ import os
 import os.path
 import sys
 import subprocess
-import boto
-import boto.dynamodb2
-import boto.exception
+import boto3
 import glob
 import tempfile
 import json
@@ -102,7 +100,8 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
   retCode = 0
   dateStr = datetime.datetime.now().strftime("%Y/%m/%d/%H_%M.%S")
 
-  conn = boto.dynamodb2.connect_to_region(region)
+  #conn = boto.dynamodb2.connect_to_region(region)
+  conn = boto3.client('dynamodb', region_name=region)
 
   if conn:
     myLog("connected to dynamodb (region: %s)" % region)
@@ -268,7 +267,7 @@ def describeTables(conn, table_list):
     table_list_return = []
 
     for table in table_list:
-        table_desc = conn.describe_table(table)
+        table_desc = conn.describe_table(TableName=table)
         table_return = dict()
         table_return['name'] = table
         table_return['read'] = str(table_desc['Table']['ProvisionedThroughput']['ReadCapacityUnits'])
@@ -301,7 +300,7 @@ def listTables(conn):
       table_list_return.append(table_name)
 
     if LastEvaluatedTableName != '':
-      table_list = conn.list_tables(LastEvaluatedTableName,100)
+      table_list = conn.list_tables(ExclusiveStartTableName=LastEvaluatedTableName,Limit=100)
 
   myLog("Read %d tables from dynamodb" % len(table_list_return))
 
