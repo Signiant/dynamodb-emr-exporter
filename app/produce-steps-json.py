@@ -139,7 +139,7 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
         tableS3Path = s3ExportPath + "/" + table['name']
 
         # Does this table have autoscaling enabled?
-        scalable_target_info = scalable_target_exists("table/" + table['name'],"dynamodb:table:ReadCapacityUnits")
+        scalable_target_info = scalable_target_exists(region,"table/" + table['name'],"dynamodb:table:ReadCapacityUnits")
         if scalable_target_info is not None:
             myLog("Table " + table['name'] + " has autoscaling enabled")
             autoscale_min_spike_read_capacity = spikedread
@@ -333,12 +333,12 @@ def listTables(conn):
   return table_list_return
 
 # Checks if a dynamo table has a scalable target (ie. is autoscale enabled?)
-def scalable_target_exists(resource_id,scalable_dimension):
+def scalable_target_exists(region,resource_id,scalable_dimension):
     response=None
     retval=None
 
     myLog("Checking if scalable target exists for " + resource_id + " for dimension " + scalable_dimension)
-    client = boto3.client('application-autoscaling')
+    client = boto3.client('application-autoscaling', region_name=region)
 
     try:
         response = client.describe_scalable_targets(
