@@ -13,6 +13,7 @@ import boto3
 import glob
 import tempfile
 import json
+import pprint
 
 parser = argparse.ArgumentParser(
   prog="produce-steps-json",
@@ -100,7 +101,6 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
   retCode = 0
   dateStr = datetime.datetime.now().strftime("%Y/%m/%d/%H_%M.%S")
 
-  #conn = boto.dynamodb2.connect_to_region(region)
   conn = boto3.client('dynamodb', region_name=region)
 
   if conn:
@@ -134,16 +134,27 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
       if filter in table['name']:
         myLog("Generating EMR export JSON for table: [%s]" %table['name'])
 
+        autoscale_min_spike_read_capacity = None # Assume no autoscaling
+        autoscale_min_reset_read_capacity = None
         tableS3Path = s3ExportPath + "/" + table['name']
+
+        # Does this table have autoscaling enabled?
+        scalable_target_info = scalable_target_exists("table/" + table['name'],"dynamodb:table:ReadCapacityUnits")
+        if scalable_target_info is not None:
+            myLog("Table " + table['name'] + " has autoscaling enabled")
+            autoscale_min_spike_read_capacity = spikedread
+            autoscale_min_reset_read_capacity=scalable_target_info[0]['MinCapacity']
+            myLog("Table " + table['name'] + " has a current AS min capacity of " + str(autoscale_min_reset_read_capacity))
+
         if spikedread is not None:
-            tputSpikeStep = generateThroughputUpdateStep(table['name'], "Spike", s3ScriptPath, spikedread, table['write'], region)
+            tputSpikeStep = generateThroughputUpdateStep(table['name'], "Spike", s3ScriptPath, spikedread, autoscale_min_spike_read_capacity, table['write'], region)
             exportSteps.append(tputSpikeStep)
 
         tableExportStep = generateTableExportStep(table['name'],tableS3Path,readtput,region)
         exportSteps.append(tableExportStep)
 
         if spikedread is not None:
-            tputResetStep = generateThroughputUpdateStep(table['name'], "Reset", s3ScriptPath, table['read'], table['write'], region)
+            tputResetStep = generateThroughputUpdateStep(table['name'], "Reset", s3ScriptPath, table['read'], autoscale_min_reset_read_capacity, table['write'], region)
             exportSteps.append(tputResetStep)
 
         tableImportStep = generateTableImportStep(table['name'],tableS3Path,writetput,impregion)
@@ -161,21 +172,36 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
 ###########
 ## Add a JSON entry for a single table throughput update step
 ###########
-def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, writetput, region):
+def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, autoscale_min_throughput,writetput, region):
     myLog("addThroughputUpdateStep %s" % tableName)
 
     tputUpdateDict = {}
-    tputUpdateDict = { "Name": stepName + " Throughput: " + tableName,
-                        "ActionOnFailure": "CONTINUE",
-                        "Type": "CUSTOM_JAR",
-                        "Jar": "s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
-                        "Args": [s3Path,
-                            region,
-                            tableName,
-                            readtput,
-                            writetput
-                            ]
-                    }
+
+    if autoscale_min_throughput:
+        tputUpdateDict = { "Name": stepName + " Throughput: " + tableName,
+                            "ActionOnFailure": "CONTINUE",
+                            "Type": "CUSTOM_JAR",
+                            "Jar": "s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
+                            "Args": [s3Path,
+                                region,
+                                tableName,
+                                readtput,
+                                writetput,
+                                str(autoscale_min_throughput)
+                                ]
+                        }
+    else:
+        tputUpdateDict = { "Name": stepName + " Throughput: " + tableName,
+                            "ActionOnFailure": "CONTINUE",
+                            "Type": "CUSTOM_JAR",
+                            "Jar": "s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
+                            "Args": [s3Path,
+                                region,
+                                tableName,
+                                readtput,
+                                writetput
+                                ]
+                        }
 
     return tputUpdateDict
 
@@ -305,6 +331,31 @@ def listTables(conn):
   myLog("Read %d tables from dynamodb" % len(table_list_return))
 
   return table_list_return
+
+# Checks if a dynamo table has a scalable target (ie. is autoscale enabled?)
+def scalable_target_exists(resource_id,scalable_dimension):
+    response=None
+    retval=None
+
+    myLog("Checking if scalable target exists for " + resource_id + " for dimension " + scalable_dimension)
+    client = boto3.client('application-autoscaling')
+
+    try:
+        response = client.describe_scalable_targets(
+            ServiceNamespace='dynamodb',
+            ResourceIds=[
+                resource_id,
+            ],
+            ScalableDimension=scalable_dimension
+        )
+    except Exception, e:
+        myLog("Failed to describe scalable targets " + str(e))
+
+    if response:
+        if response['ScalableTargets']:
+            retval = response['ScalableTargets']
+
+    return retval
 
 def writeFile(content,filename):
   myLog("writeFile %s" % filename)
