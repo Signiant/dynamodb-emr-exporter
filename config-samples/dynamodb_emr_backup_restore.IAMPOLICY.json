@@ -14,7 +14,12 @@
             "dynamodb:UpdateTable",
             "dynamodb:WriteItem",
             "dynamodb:BatchWriteItem",
-            "cloudwatch:PutMetricData"
+            "cloudwatch:PutMetricData",
+            "elasticmapreduce:Describe*",
+            "kms:GenerateDataKey",
+            "application-autoscaling:DescribeScalableTargets",
+            "application-autoscaling:RegisterScalableTarget",
+            "iam:PassRole"
          ],
          "Effect":"Allow",
          "Resource":[

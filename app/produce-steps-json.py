@@ -110,12 +110,6 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
     exportSteps = []
     importSteps = []
 
-    # Generate the taskRunner step - this is common
-    taskRunnerStep = addTaskRunnerStep()
-
-    exportSteps.append(taskRunnerStep)
-    importSteps.append(taskRunnerStep)
-
     # get a list of all tables in the region
     table_list = listTables(conn)
     table_desc_list = describeTables(conn, table_list)
@@ -245,36 +239,6 @@ def generateTableImportStep(tableName,s3Path,writetput,impregion):
                     }
 
   return tableImportDict
-
-###########
-## Add a JSON entry for the taskRunner installation step.  Common to export and import
-###########
-def addTaskRunnerStep():
-  myLog("addTaskRunnerStep")
-
-  taskRunnerDict = {"Name":"Install TaskRunner",
-                    "ActionOnFailure": "TERMINATE_CLUSTER",
-                    "Type": "CUSTOM_JAR",
-                    "Jar":"s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
-                    "Args":["s3://datapipeline-us-east-1/us-east-1/bootstrap-actions/latest/TaskRunner/install-remote-runner-v2",
-                            "--workerGroup=1234",
-                            "--endpoint=https://datapipeline.us-east-1.amazonaws.com",
-                            "--region=us-east-1",
-                            "--logUri=none",
-                            "--taskRunnerId=DynamoTaskRunner1",
-                            "--zipFile=http://datapipeline-us-east-1.s3.amazonaws.com/us-east-1/software/latest/TaskRunner/TaskRunner-1.0.zip",
-                            "--mysqlFile=http://datapipeline-us-east-1.s3.amazonaws.com/us-east-1/software/latest/TaskRunner/mysql-connector-java-bin.jar",
-                            "--hiveCsvSerdeFile=http://datapipeline-us-east-1.s3.amazonaws.com/us-east-1/software/latest/TaskRunner/csv-serde.jar",
-                            "--proxyHost=",
-                            "--proxyPort=-1",
-                            "--username=",
-                            "--password=",
-                            "--windowsDomain=",
-                            "--windowsWorkgroup=",
-                            "--releaseLabel="
-                           ]
-                   }
-  return taskRunnerDict
 
 ###########
 ## Generate a formatted S3 path which is used in the export and import steps file

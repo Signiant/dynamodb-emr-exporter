@@ -1,0 +1,13 @@
+[
+   {
+      "Classification":"mapred-site",
+      "Properties":{
+         "mapreduce.map.java.opts":"-Xmx2048m",
+         "mapreduce.reduce.java.opts":"-Xmx2048m",
+         "mapreduce.job.reuse.jvm.num.tasks":"1",
+         "mapreduce.map.memory.mb":"2560",
+         "mapreduce.reduce.memory.mb":"2560",
+         "mapreduce.map.speculative":"false"
+      }
+   }
+]

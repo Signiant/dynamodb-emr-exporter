@@ -124,16 +124,12 @@ else
         mkdir -p ${JSON_OUTPUT_DIR}
 
         logMsg "Copying common json files to ${JSON_OUTPUT_DIR}"
-        cp -f ${COMMON_JSON}/applications.json ${JSON_OUTPUT_DIR}/applications.json
         cp -f ${COMMON_JSON}/ec2-attributes.json ${JSON_OUTPUT_DIR}/ec2-attributes.json
         cp -f ${COMMON_JSON}/instance-groups.json ${JSON_OUTPUT_DIR}/instance-groups.json
-        cp -f ${COMMON_JSON}/bootstrap-actions-export.json ${JSON_OUTPUT_DIR}/bootstrap-actions-export.json
-        cp -f ${COMMON_JSON}/bootstrap-actions-import.json ${JSON_OUTPUT_DIR}/bootstrap-actions-import.json
+        cp -f ${COMMON_JSON}/configurations.json ${JSON_OUTPUT_DIR}/configurations.json
 
-        if [ ! -e "${JSON_OUTPUT_DIR}/applications.json" ] ||
-           [ ! -e "${JSON_OUTPUT_DIR}/ec2-attributes.json" ] ||
-           [ ! -e "${JSON_OUTPUT_DIR}/bootstrap-actions-export.json" ] ||
-           [ ! -e "${JSON_OUTPUT_DIR}/bootstrap-actions-import.json" ] ||
+        if [ ! -e "${JSON_OUTPUT_DIR}/ec2-attributes.json" ] ||
+           [ ! -e "${JSON_OUTPUT_DIR}/configurations.json" ] ||
            [ ! -e "${JSON_OUTPUT_DIR}/instance-groups.json" ]; then
                 logMsg "Error copying common json files to ${JSON_OUTPUT_DIR}"
                 NEXTPHASE=0
@@ -220,15 +216,15 @@ if [ $NEXTPHASE == 1 ]; then
                 logMsg "Creating new EMR Cluster NAME:${CLUSTER_NAME} Attempt ${CURR_ATTEMPT} of ${RETRIES}"
 
                 CLUSTERID=$(aws emr create-cluster --name "${CLUSTER_NAME}"                                        \
-                            --ami-version 3.8.0                                                                    \
+                            --release-label "emr-5.8.0"                                                            \
                             --service-role "EMR_DefaultRole"                                                       \
+                            --security-configuration "dynamodb-backups"                                            \
                             --tags Name=${CLUSTER_NAME} signiant:product=devops signiant:email=devops@signiant.com \
                             --enable-debugging                                                                     \
                             --log-uri ${S3LOCATION}/emr-logs                                                       \
-                            --applications file://${JSON_OUTPUT_DIR}/applications.json                             \
+                            --configurations file://${JSON_OUTPUT_DIR}/configurations.json                         \
                             --instance-groups file://${JSON_OUTPUT_DIR}/instance-groups.json                       \
                             --ec2-attributes file://${JSON_OUTPUT_DIR}/ec2-attributes.json                         \
-                            --bootstrap-actions file://${JSON_OUTPUT_DIR}/bootstrap-actions-export.json            \
                             --steps file://${JSON_OUTPUT_DIR}/exportSteps.json                                     \
                             --auto-terminate                                                                       \
                             --visible-to-all-users                                                                 \

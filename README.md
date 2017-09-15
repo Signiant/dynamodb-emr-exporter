@@ -9,6 +9,9 @@ The tool is packaged into a Docker container with all the prerequisites required
 ** Must be named _**dynamodb_emr_backup_restore**_
 ** Use the IAM policy contained in _**config-samples/dynamodb_emr_backup_restore.IAMPOLICY.json**_
 
+* Create a new EMR Security Configuration in any region to backup or restore to
+** Must be named _**dynamodb-backups**_
+
 * Run the docker container as follows:
 
 ```bash
