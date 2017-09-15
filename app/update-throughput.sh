@@ -102,7 +102,7 @@ scalable_target_exists=$(scalable_target_exists ${table_resource_id} ${table_sca
 # Check if we have autoscaling enabled.  If so, we need to update
 # the minimum tput so that we don't keep autoscaling down
 if [ "${scalable_target_exists}" != "false" ]; then
-  echo "Table ${resource_id} has an autoscaling policy - manipulating the min-tput"
+  echo "Table ${TABLE_NAME} has an autoscaling policy - manipulating the min-tput"
   # get the role ARN and the max capacity currently set...the min capacity we are provided
   role_arn=$(echo ${scalable_target_exists}|cut -f1 -d" "); echo "role arn is ${role_arn}"
   max_tput=$(echo ${scalable_target_exists}|cut -f2 -d" "); echo "max_tput is ${max_tput}"
