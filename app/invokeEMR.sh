@@ -103,7 +103,7 @@ logMsg "Starting up"
 aws emr list-clusters --active --region ${REGION} | grep -q ${CLUSTER_NAME}
 STATUS=$?
 
-if [ $STATUS == 0 ]; then
+if [ $STATUS -eq 0 ]; then
         # We already have a cluster running - bail
         logMsg "Cluster ERROR: existing cluster ${CLUSTER_NAME} running"
         NEXTPHASE=0
@@ -116,47 +116,51 @@ fi
 ######
 ## PHASE 2 - Copy in the common JSON files
 ######
-if [ ! -d "${COMMON_JSON}" ]; then
-        logMsg "The common-json folder is missing - unable to continue"
-        NEXTPHASE=0
-        RETCODE=2
-else
-        mkdir -p ${JSON_OUTPUT_DIR}
+if [ $NEXTPHASE -eq 1 ]; then
+    if [ ! -d "${COMMON_JSON}" ]; then
+            logMsg "The common-json folder is missing - unable to continue"
+            NEXTPHASE=0
+            RETCODE=2
+    else
+            mkdir -p ${JSON_OUTPUT_DIR}
 
-        logMsg "Copying common json files to ${JSON_OUTPUT_DIR}"
-        cp -f ${COMMON_JSON}/ec2-attributes.json ${JSON_OUTPUT_DIR}/ec2-attributes.json
-        cp -f ${COMMON_JSON}/instance-groups.json ${JSON_OUTPUT_DIR}/instance-groups.json
-        cp -f ${COMMON_JSON}/configurations.json ${JSON_OUTPUT_DIR}/configurations.json
+            logMsg "Copying common json files to ${JSON_OUTPUT_DIR}"
+            cp -f ${COMMON_JSON}/ec2-attributes.json ${JSON_OUTPUT_DIR}/ec2-attributes.json
+            cp -f ${COMMON_JSON}/instance-groups.json ${JSON_OUTPUT_DIR}/instance-groups.json
+            cp -f ${COMMON_JSON}/configurations.json ${JSON_OUTPUT_DIR}/configurations.json
 
-        if [ ! -e "${JSON_OUTPUT_DIR}/ec2-attributes.json" ] ||
-           [ ! -e "${JSON_OUTPUT_DIR}/configurations.json" ] ||
-           [ ! -e "${JSON_OUTPUT_DIR}/instance-groups.json" ]; then
-                logMsg "Error copying common json files to ${JSON_OUTPUT_DIR}"
-                NEXTPHASE=0
-                RETCODE=2
-        fi
+            if [ ! -e "${JSON_OUTPUT_DIR}/ec2-attributes.json" ] ||
+               [ ! -e "${JSON_OUTPUT_DIR}/configurations.json" ] ||
+               [ ! -e "${JSON_OUTPUT_DIR}/instance-groups.json" ]; then
+                    logMsg "Error copying common json files to ${JSON_OUTPUT_DIR}"
+                    NEXTPHASE=0
+                    RETCODE=2
+            fi
+    fi
 fi
 
 ######
 ## PHASE 2 - Upload the update-throughput script
 ######
-if [ ! -e $THROUGHPUT_SCRIPT ]; then
-  logMsg "The update-throughput.sh script is missing - unable to continue"
-  NEXTPHASE=0
-  RETCODE=2
-else
-  aws s3 cp $THROUGHPUT_SCRIPT ${S3LOCATION}/scripts/update-throughput.sh
-  if [ $? -ne 0 ]; then
-    echo "ERROR: Unable to upload the update-throughput script to s3, unable to continue"
-    RETCODE=2
-    NEXTPHASE=0
-  fi
+if [ $NEXTPHASE -eq 1 ]; then
+    if [ ! -e $THROUGHPUT_SCRIPT ]; then
+      logMsg "The update-throughput.sh script is missing - unable to continue"
+      NEXTPHASE=0
+      RETCODE=2
+    else
+      aws s3 cp $THROUGHPUT_SCRIPT ${S3LOCATION}/scripts/update-throughput.sh
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Unable to upload the update-throughput script to s3, unable to continue"
+        RETCODE=2
+        NEXTPHASE=0
+      fi
+    fi
 fi
 
 ######
 ## PHASE 2 - Generate the steps files
 ######
-if [ $NEXTPHASE == 1 ]; then
+if [ $NEXTPHASE -eq 1 ]; then
         # PHASE 2 - Get the EMR steps file for the tables to backup
         logMsg "Generating JSON files (R:${REGION} I: ${IMPORT_REGION} READ:${READ_TPUT} WRITE:${WRITE_TPUT} FILT:${TABLE_FILTER} JDIR:${JSON_OUTPUT_DIR} S3DIR:${S3LOCATION}"
 
@@ -165,7 +169,7 @@ if [ $NEXTPHASE == 1 ]; then
         fi
         ${STEP_PRODUCER} -a ${APPNAME} -r ${REGION} -i ${IMPORT_REGION} -e ${READ_TPUT} -w ${WRITE_TPUT} -f ${TABLE_FILTER} ${SPIKE_ARG} ${JSON_OUTPUT_DIR} ${S3LOCATION}
         RESULT=$?
-        if [ $RESULT == 0 ]; then
+        if [ $RESULT -eq 0 ]; then
                 NEXTPHASE=1
         else
                 logMsg "Cluster ERROR: Unable to generate the EMR steps files NAME:${CLUSTER_NAME}"
@@ -187,7 +191,7 @@ fi
 ######
 ## PHASE 3 - Create the EMR cluster (with retries)
 ######
-if [ $NEXTPHASE == 1 ]; then
+if [ $NEXTPHASE -eq 1 ]; then
         RETRIES=5
         CURR_ATTEMPT=1
 
@@ -236,7 +240,7 @@ if [ $NEXTPHASE == 1 ]; then
                         aws emr wait cluster-running --cluster-id ${CLUSTERID} --region ${REGION}
                         STATUS=$?
 
-                        if [ $STATUS == 0 ]; then
+                        if [ $STATUS -eq 0 ]; then
                                 logMsg "Cluster NAME:${CLUSTER_NAME} ID:${CLUSTERID} launched successfully"
                                 CLUSTERUP=1
                                 break
@@ -258,7 +262,7 @@ if [ $NEXTPHASE == 1 ]; then
         ####
         ## Phase 3.5 - poll the cluster for status so we know when it's done
         ####
-        if [ $CLUSTERUP == 1 ]; then
+        if [ $CLUSTERUP -eq 1 ]; then
                 # We have a cluster provisioned...now we can poll it's tasks and make sure it completes ok
 
                 # First tag the backup as in progress so any downstream processes know not to copy this
@@ -268,7 +272,7 @@ if [ $NEXTPHASE == 1 ]; then
                 pollCluster $CLUSTERID $CLUSTER_NAME
                 STATUS=$?
 
-                if [ $STATUS == 0 ]; then
+                if [ $STATUS -eq 0 ]; then
                         logMsg "Cluster SUCCESS NAME:${CLUSTER_NAME} ID:${CLUSTERID}"
 
                         # Copy the steps json files to S3 so we have a copy for 'this' job
