@@ -134,8 +134,6 @@ else
                 logMsg "Error copying common json files to ${JSON_OUTPUT_DIR}"
                 NEXTPHASE=0
                 RETCODE=2
-        else
-                NEXTPHASE=1
         fi
 fi
 
