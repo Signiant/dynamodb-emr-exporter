@@ -68,6 +68,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    '-x',
+    '--excludes',
+    type=str,
+    help="A file containing a list of tables to exclude"
+)
+
+parser.add_argument(
   '-f',
   '--filter',
   type=str,
@@ -96,12 +103,22 @@ def myLog(message):
   syslog.syslog(syslogMsg)
   print '%s %s' % (dateTimeStr,message)
 
-def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3location,appname):
+def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3location,appname,excludes):
 
   retCode = 0
   dateStr = datetime.datetime.now().strftime("%Y/%m/%d/%H_%M.%S")
 
   conn = boto3.client('dynamodb', region_name=region)
+
+  # Have we been given an excludes file?  If so, read it.  Any tables in here
+  # will not have export steps generated for them
+  if excludes:
+      myLog("excludes specified - reading " + excludes)
+
+      if os.path.exists(excludes):
+          exclude_table_list = [line.rstrip('\n') for line in open(excludes)]
+      else:
+          myLog("Unable to open " + excludes + " for reading")
 
   if conn:
     myLog("connected to dynamodb (region: %s)" % region)
@@ -126,7 +143,12 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
     # Now process them, ignoring any that don't match our filter
     for table in table_desc_list:
       if filter in table['name']:
-        myLog("Generating EMR export JSON for table: [%s]" %table['name'])
+
+        if table['name'] in exclude_table_list:
+          myLog("Table " + table['name'] + " is in the exclude list - skipping")
+          continue
+        else:
+          myLog("Generating EMR export JSON for table: [%s]" %table['name'])
 
         autoscale_min_spike_read_capacity = None # Assume no autoscaling
         autoscale_min_reset_read_capacity = None

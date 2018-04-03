@@ -40,6 +40,9 @@ Where
 
 An optional environment variable _**DEBUG_OUTPUT**_ can also be specified to the container which will run the underlying script with debug enabled
 
+## Excluding tables
+You can place an optional file called _**excludes**_ into the S3 based location (ie. whatever you have specified for _**S3_location**_) to exclude tables.  The format is one table per line and it must be the full table name (no wildcards are supported here).  Any tables which match the _**table_filter**_ BUT also match an entry in the _**excludes**_ file will NOT be exported
+
 ## Import Usage
 
 When the export runs, it also generates the configuration needed to execute an import. You can find the configuration file for imorting within the S3 location you specified (importSteps.json).

@@ -23,7 +23,7 @@ INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 COMMON_JSON=${INSTALL_DIR}/common-json
 STEP_PRODUCER=${INSTALL_DIR}/produce-steps-json.py
 THROUGHPUT_SCRIPT=${INSTALL_DIR}/update-throughput.sh
-JSON_OUTPUT_DIR=${INSTALLDIR}/${TABLE_FILTER}
+JSON_OUTPUT_DIR=${INSTALL_DIR}/${TABLE_FILTER}
 NEXTPHASE=0
 RETCODE=0
 
@@ -140,7 +140,7 @@ if [ $NEXTPHASE -eq 1 ]; then
 fi
 
 ######
-## PHASE 2 - Upload the update-throughput script
+## PHASE 3 - Upload the update-throughput script
 ######
 if [ $NEXTPHASE -eq 1 ]; then
     if [ ! -e $THROUGHPUT_SCRIPT ]; then
@@ -157,8 +157,21 @@ if [ $NEXTPHASE -eq 1 ]; then
     fi
 fi
 
+
 ######
-## PHASE 2 - Generate the steps files
+## PHASE 4 - See if we have an excludes file in the S3 bucket and download if so
+######
+if [ $NEXTPHASE -eq 1 ]; then
+    aws s3 cp ${S3LOCATION}/excludes ./excludes
+
+    if [ $? -eq 0 ]; then
+      echo "Excludes file found in S3 - downloading ${S3LOCATION}/excludes"
+      EXCLUDE_ARG="-x ./excludes"
+    fi
+fi
+
+######
+## PHASE 5 - Generate the steps files
 ######
 if [ $NEXTPHASE -eq 1 ]; then
         # PHASE 2 - Get the EMR steps file for the tables to backup
@@ -167,7 +180,7 @@ if [ $NEXTPHASE -eq 1 ]; then
         if [ -n "${SPIKED_THROUGHPUT}" ]; then
           SPIKE_ARG="-s ${SPIKED_THROUGHPUT}"
         fi
-        ${STEP_PRODUCER} -a ${APPNAME} -r ${REGION} -i ${IMPORT_REGION} -e ${READ_TPUT} -w ${WRITE_TPUT} -f ${TABLE_FILTER} ${SPIKE_ARG} ${JSON_OUTPUT_DIR} ${S3LOCATION}
+        ${STEP_PRODUCER} -a ${APPNAME} -r ${REGION} -i ${IMPORT_REGION} -e ${READ_TPUT} -w ${WRITE_TPUT} -f ${TABLE_FILTER} ${SPIKE_ARG} ${EXCLUDE_ARG} ${JSON_OUTPUT_DIR} ${S3LOCATION}
         RESULT=$?
         if [ $RESULT -eq 0 ]; then
                 NEXTPHASE=1
@@ -189,7 +202,7 @@ if [ $NEXTPHASE -eq 1 ]; then
 fi
 
 ######
-## PHASE 3 - Create the EMR cluster (with retries)
+## PHASE 6 - Create the EMR cluster (with retries)
 ######
 if [ $NEXTPHASE -eq 1 ]; then
         RETRIES=5
@@ -260,7 +273,7 @@ if [ $NEXTPHASE -eq 1 ]; then
         done
 
         ####
-        ## Phase 3.5 - poll the cluster for status so we know when it's done
+        ## Phase 6.5 - poll the cluster for status so we know when it's done
         ####
         if [ $CLUSTERUP -eq 1 ]; then
                 # We have a cluster provisioned...now we can poll it's tasks and make sure it completes ok
