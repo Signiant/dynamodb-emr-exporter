@@ -225,51 +225,63 @@ if [ $NEXTPHASE -eq 1 ]; then
 
         while [ $CURR_ATTEMPT -le $RETRIES ]
         do
-                CLUSTERUP=0
+                #double check that cluster isn't really up with one more check
+                aws emr list-clusters --active --region ${REGION} | grep -q ${CLUSTER_NAME}
 
-                # Invoke the aws CLI to create the cluster
-                logMsg "Creating new EMR Cluster NAME:${CLUSTER_NAME} Attempt ${CURR_ATTEMPT} of ${RETRIES}"
-
-                CLUSTERID=$(aws emr create-cluster --name "${CLUSTER_NAME}"                                        \
-                            --release-label "emr-5.8.0"                                                            \
-                            --service-role "EMR_DefaultRole"                                                       \
-                            --security-configuration "dynamodb-backups"                                            \
-                            --tags Name=${CLUSTER_NAME} signiant:product=devops signiant:email=devops@signiant.com \
-                            --enable-debugging                                                                     \
-                            --log-uri ${S3LOCATION}/emr-logs                                                       \
-                            --configurations file://${JSON_OUTPUT_DIR}/configurations.json                         \
-                            --instance-groups file://${JSON_OUTPUT_DIR}/instance-groups.json                       \
-                            --ec2-attributes file://${JSON_OUTPUT_DIR}/ec2-attributes.json                         \
-                            --steps file://${JSON_OUTPUT_DIR}/exportSteps.json                                     \
-                            --auto-terminate                                                                       \
-                            --visible-to-all-users                                                                 \
-                            --output text                                                                          \
-                            --region ${REGION})
-
-                logMsg "CLUSTERID for ${CLUSTER_NAME} is $CLUSTERID"
-                # Now use the waiter to make sure the cluster is launched successfully
-                if [ "$CLUSTERID" != "" ]; then
-                        logMsg "Waiting for cluster NAME:${CLUSTER_NAME} ID:${CLUSTERID} to start...."
-                        aws emr wait cluster-running --cluster-id ${CLUSTERID} --region ${REGION}
-                        STATUS=$?
-
-                        if [ $STATUS -eq 0 ]; then
-                                logMsg "Cluster NAME:${CLUSTER_NAME} ID:${CLUSTERID} launched successfully"
-                                CLUSTERUP=1
-                                break
-                        else
-                                logMsg "Cluster ERROR: launch failure NAME:${CLUSTER_NAME} ID:${CLUSTERID} Attempt ${CURR_ATTEMPT} of ${RETRIES} "
-                                CLUSTERUP=0
-                                # Fall into the next iteration of the loop to try and create the cluster again
-                        fi
+                if [ $STATUS -eq 0 ]; then
+                        # We already have a cluster running - bail
+                        logMsg "Cluster ERROR: existing cluster ${CLUSTER_NAME} running"
+                        CLUSTERUP=1
+                        #set current attemps greated than while condition
+                        CURR_ATTEMPT=$[$RETRIES+1]
                 else
-                        logMsg "Cluster ERROR: no cluster ID returned NAME:${CLUSTER_NAME}"
+                        logMsg "No existing EMR cluster with  name ${CLUSTER_NAME} running.  Creating"
                         CLUSTERUP=0
-                fi
 
-                CURR_ATTEMPT=$[$CURR_ATTEMPT+1]
-                logMsg "Delaying ${RETRY_DELAY} seconds before attempting to create cluster..."
-                sleep ${RETRY_DELAY}
+                        # Invoke the aws CLI to create the cluster
+                        logMsg "Creating new EMR Cluster NAME:${CLUSTER_NAME} Attempt ${CURR_ATTEMPT} of ${RETRIES}"
+
+                        CLUSTERID=$(aws emr create-cluster --name "${CLUSTER_NAME}"                                        \
+                                    --release-label "emr-5.8.0"                                                            \
+                                    --service-role "EMR_DefaultRole"                                                       \
+                                    --security-configuration "dynamodb-backups"                                            \
+                                    --tags Name=${CLUSTER_NAME} signiant:product=devops signiant:email=devops@signiant.com \
+                                    --enable-debugging                                                                     \
+                                    --log-uri ${S3LOCATION}/emr-logs                                                       \
+                                    --configurations file://${JSON_OUTPUT_DIR}/configurations.json                         \
+                                    --instance-groups file://${JSON_OUTPUT_DIR}/instance-groups.json                       \
+                                    --ec2-attributes file://${JSON_OUTPUT_DIR}/ec2-attributes.json                         \
+                                    --steps file://${JSON_OUTPUT_DIR}/exportSteps.json                                     \
+                                    --auto-terminate                                                                       \
+                                    --visible-to-all-users                                                                 \
+                                    --output text                                                                          \
+                                    --region ${REGION})
+
+                        logMsg "CLUSTERID for ${CLUSTER_NAME} is $CLUSTERID"
+                        # Now use the waiter to make sure the cluster is launched successfully
+                        if [ "$CLUSTERID" != "" ]; then
+                                logMsg "Waiting for cluster NAME:${CLUSTER_NAME} ID:${CLUSTERID} to start...."
+                                aws emr wait cluster-running --cluster-id ${CLUSTERID} --region ${REGION}
+                                STATUS=$?
+
+                                if [ $STATUS -eq 0 ]; then
+                                        logMsg "Cluster NAME:${CLUSTER_NAME} ID:${CLUSTERID} launched successfully"
+                                        CLUSTERUP=1
+                                        break
+                                else
+                                        logMsg "Cluster ERROR: launch failure NAME:${CLUSTER_NAME} ID:${CLUSTERID} Attempt ${CURR_ATTEMPT} of ${RETRIES} "
+                                        CLUSTERUP=0
+                                        # Fall into the next iteration of the loop to try and create the cluster again
+                                fi
+                        else
+                                logMsg "Cluster ERROR: no cluster ID returned NAME:${CLUSTER_NAME}"
+                                CLUSTERUP=0
+                        fi
+
+                        CURR_ATTEMPT=$[$CURR_ATTEMPT+1]
+                        logMsg "Delaying ${RETRY_DELAY} seconds before attempting to create cluster..."
+                        sleep ${RETRY_DELAY}
+                fi
         done
 
         ####
