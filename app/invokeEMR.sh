@@ -227,12 +227,13 @@ if [ $NEXTPHASE -eq 1 ]; then
         do
                 #double check that cluster isn't really up with one more check
                 aws emr list-clusters --active --region ${REGION} | grep -q ${CLUSTER_NAME}
+                STATUS=$?
 
                 if [ $STATUS -eq 0 ]; then
                         # We already have a cluster running - bail
                         logMsg "Cluster ERROR: existing cluster ${CLUSTER_NAME} running"
                         CLUSTERUP=1
-                        #set current attemps greated than while condition
+                        #set current attemps greater than while condition
                         CURR_ATTEMPT=$[$RETRIES+1]
                 else
                         logMsg "No existing EMR cluster with  name ${CLUSTER_NAME} running.  Creating"
