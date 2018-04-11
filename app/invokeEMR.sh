@@ -226,7 +226,7 @@ if [ $NEXTPHASE -eq 1 ]; then
         while [ $CURR_ATTEMPT -le $RETRIES ]
         do
                 #double check that cluster isn't really running with one more check
-                aws emr list-clusters --cluster-states "RUNNING" --region ${REGION} | grep -q ${CLUSTER_NAME}
+                aws emr list-clusters --cluster-states STARTING BOOTSTRAPPING RUNNING WAITING --region ${REGION} | grep -q ${CLUSTER_NAME}
                 STATUS=$?
 
                 if [ $STATUS -eq 0 ]; then
