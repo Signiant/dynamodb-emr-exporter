@@ -16,7 +16,7 @@ IMPORT_REGION=$7
 SPIKED_THROUGHPUT=$8
 
 WRITE_TPUT=0.8		# Used when we generate the Import steps
-RETRY_DELAY=10
+RETRY_DELAY=60
 
 # Just vars
 INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -225,8 +225,8 @@ if [ $NEXTPHASE -eq 1 ]; then
 
         while [ $CURR_ATTEMPT -le $RETRIES ]
         do
-                #double check that cluster isn't really up with one more check
-                aws emr list-clusters --active --region ${REGION} | grep -q ${CLUSTER_NAME}
+                #double check that cluster isn't really running with one more check
+                aws emr list-clusters --cluster-states "RUNNING" --region ${REGION} | grep -q ${CLUSTER_NAME}
                 STATUS=$?
 
                 if [ $STATUS -eq 0 ]; then
