@@ -101,7 +101,7 @@ def myLog(message):
 
   syslogMsg = procName + ": " + message
   syslog.syslog(syslogMsg)
-  print '%s %s' % (dateTimeStr,message)
+  print ('%s %s' % (dateTimeStr,message))
 
 def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3location,appname,excludes):
 
@@ -154,24 +154,28 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
         autoscale_min_reset_read_capacity = None
         tableS3Path = s3ExportPath + "/" + table['name']
 
-        # Does this table have autoscaling enabled?
-        scalable_target_info = scalable_target_exists(region,"table/" + table['name'],"dynamodb:table:ReadCapacityUnits")
-        if scalable_target_info is not None:
+        # Check if table is set to On Demand Capacity
+        if int(table['read']) > 0:
+          myLog("Table uses provisioned capacity - need to add throughput spike and reset steps")
+          # Does this table have autoscaling enabled?
+          scalable_target_info = scalable_target_exists(region,"table/" + table['name'],"dynamodb:table:ReadCapacityUnits")
+          if scalable_target_info is not None:
             myLog("Table " + table['name'] + " has autoscaling enabled")
-            autoscale_min_spike_read_capacity = spikedread
-            autoscale_min_reset_read_capacity=scalable_target_info[0]['MinCapacity']
+            autoscale_min_spike_read_capacity = scalable_target_info[0]['MinCapacity'] + int(spikedread)
+            autoscale_min_reset_read_capacity = scalable_target_info[0]['MinCapacity']
             myLog("Table " + table['name'] + " has a current AS min capacity of " + str(autoscale_min_reset_read_capacity))
 
-        if spikedread is not None:
-            tputSpikeStep = generateThroughputUpdateStep(table['name'], "Spike", s3ScriptPath, spikedread, autoscale_min_spike_read_capacity, table['write'], region)
+          if spikedread is not None:
+            tputSpikeStep = generateThroughputUpdateStep(table['name'], "Spike", s3ScriptPath, autoscale_min_spike_read_capacity, autoscale_min_spike_read_capacity, table['write'], region)
             exportSteps.append(tputSpikeStep)
 
         tableExportStep = generateTableExportStep(table['name'],tableS3Path,readtput,region)
         exportSteps.append(tableExportStep)
 
-        if spikedread is not None:
-            tputResetStep = generateThroughputUpdateStep(table['name'], "Reset", s3ScriptPath, table['read'], autoscale_min_reset_read_capacity, table['write'], region)
-            exportSteps.append(tputResetStep)
+        if int(table['read']) > 0:
+            if spikedread is not None:
+                tputResetStep = generateThroughputUpdateStep(table['name'], "Reset", s3ScriptPath, table['read'], autoscale_min_reset_read_capacity, table['write'], region)
+                exportSteps.append(tputResetStep)
 
         tableImportStep = generateTableImportStep(table['name'],tableS3Path,writetput,impregion)
         importSteps.append(tableImportStep)
@@ -189,7 +193,7 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
 ## Add a JSON entry for a single table throughput update step
 ###########
 def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, autoscale_min_throughput,writetput, region):
-    myLog("addThroughputUpdateStep %s" % tableName)
+    myLog("addThroughputUpdateStep (%s) %s" % (stepName, tableName))
 
     tputUpdateDict = {}
 
@@ -201,8 +205,8 @@ def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, autoscal
                             "Args": [s3Path,
                                 region,
                                 tableName,
-                                readtput,
-                                writetput,
+                                str(readtput),
+                                str(writetput),
                                 str(autoscale_min_throughput)
                                 ]
                         }
@@ -214,8 +218,8 @@ def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, autoscal
                             "Args": [s3Path,
                                 region,
                                 tableName,
-                                readtput,
-                                writetput
+                                str(readtput),
+                                str(writetput)
                                 ]
                         }
 
@@ -334,7 +338,7 @@ def scalable_target_exists(region,resource_id,scalable_dimension):
             ],
             ScalableDimension=scalable_dimension
         )
-    except Exception, e:
+    except Exception as e:
         myLog("Failed to describe scalable targets " + str(e))
 
     if response:

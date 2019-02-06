@@ -130,7 +130,7 @@ echo "Updating the base table read throughput with update-table to ${READ_CAPACI
 if [ ${RET_CODE} -eq 0 ]; then
   # Update the table throughput directly
   # This is needed in case there is no autoscaling enabled OR
-  # if autoscaling is enabled and there is no read acitivty on the table
+  # if autoscaling is enabled and there is no read activity on the table
   # Since autoscaling will never scale back down by itself
   TABLE_STATUS=$(aws dynamodb update-table \
                     --region $SOURCE_REGION \
