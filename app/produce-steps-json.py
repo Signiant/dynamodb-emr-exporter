@@ -168,6 +168,8 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
           if spikedread is not None:
             tputSpikeStep = generateThroughputUpdateStep(table['name'], "Spike", s3ScriptPath, autoscale_min_spike_read_capacity, autoscale_min_spike_read_capacity, table['write'], region)
             exportSteps.append(tputSpikeStep)
+        else:
+          myLog("Table uses on-demand capacity - no need for spike and reset throughput steps")
 
         tableExportStep = generateTableExportStep(table['name'],tableS3Path,readtput,region)
         exportSteps.append(tableExportStep)
