@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import shutil
 import datetime
 import argparse
 import syslog
@@ -8,12 +7,8 @@ import contextlib
 import os
 import os.path
 import sys
-import subprocess
 import boto3
-import glob
-import tempfile
 import json
-import pprint
 
 parser = argparse.ArgumentParser(
   prog="produce-steps-json",
@@ -171,7 +166,7 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
         else:
           myLog("Table uses on-demand capacity - no need for spike and reset throughput steps")
 
-        tableExportStep = generateTableExportStep(table['name'],tableS3Path,readtput,region)
+        tableExportStep = generateTableExportStep(table['name'],tableS3Path,readtput)
         exportSteps.append(tableExportStep)
 
         if int(table['read']) > 0:
@@ -179,7 +174,7 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
                 tputResetStep = generateThroughputUpdateStep(table['name'], "Reset", s3ScriptPath, table['read'], autoscale_min_reset_read_capacity, table['write'], region)
                 exportSteps.append(tputResetStep)
 
-        tableImportStep = generateTableImportStep(table['name'],tableS3Path,writetput,impregion)
+        tableImportStep = generateTableImportStep(table['name'],tableS3Path,writetput)
         importSteps.append(tableImportStep)
 
     # Now we can write out the import and export steps files
@@ -230,15 +225,23 @@ def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, autoscal
 ###########
 ## Add a JSON entry for a single table export step
 ###########
-def generateTableExportStep(tableName,s3Path,readtput,endpoint):
+def generateTableExportStep(tableName,s3Path,readtput,jarPath=None,classPath=None):
   myLog("addTableExportStep %s" % tableName)
+
+  if not jarPath:
+    # Default JAR
+    jarPath = "s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar"
+
+  if not classPath:
+    # Default ClassPath
+    classPath = "org.apache.hadoop.dynamodb.tools.DynamoDbExport"
 
   tableExportDict = {}
   tableExportDict = {"Name": "Export Table:" + tableName,
                      "ActionOnFailure": "CONTINUE",
                      "Type": "CUSTOM_JAR",
-                     "Jar":"s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar",
-                     "Args":["org.apache.hadoop.dynamodb.tools.DynamoDbExport",
+                     "Jar": jarPath,
+                     "Args":[classPath,
                              s3Path,
                              tableName,
                              readtput,
@@ -251,15 +254,23 @@ def generateTableExportStep(tableName,s3Path,readtput,endpoint):
 ###########
 ## Add a JSON entry for a single table import step
 ###########
-def generateTableImportStep(tableName,s3Path,writetput,impregion):
+def generateTableImportStep(tableName,s3Path,writetput,jarPath=None,classPath=None):
   myLog("addTableImportStep %s" % tableName)
+
+  if not jarPath:
+    # Default JAR
+    jarPath = "s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar"
+
+  if not classPath:
+    # Default ClassPath
+    classPath = "org.apache.hadoop.dynamodb.tools.DynamoDbImport"
 
   tableImportDict = {}
   tableImportDict = {"Name": "Import Table:" + tableName,
                      "ActionOnFailure": "CONTINUE",
                      "Type": "CUSTOM_JAR",
-                     "Jar":"s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar",
-                     "Args":["org.apache.hadoop.dynamodb.tools.DynamoDbImport",
+                     "Jar": jarPath,
+                     "Args":[classPath,
                              s3Path,
                              tableName,
                              writetput
