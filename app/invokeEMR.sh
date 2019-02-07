@@ -140,6 +140,26 @@ if [ $NEXTPHASE -eq 1 ]; then
 fi
 
 ######
+## PHASE 2.5 - Upload the jar file
+######
+if [ $NEXTPHASE -eq 1 ]; then
+    BUNDLED_JAR=emr-dynamodb-tools-4.8.0-SNAPSHOT.jar
+    BUNDLED_JAR_PATH=${INSTALL_DIR}/jar/${BUNDLED_JAR}
+    if [ ! -e "${BUNDLED_JAR_PATH}" ]; then
+        logMsg "The jar file is missing - unable to continue"
+        NEXTPHASE=0
+        RETCODE=2
+    else
+        aws s3 cp ${BUNDLED_JAR_PATH} ${S3LOCATION}/jar/${BUNDLED_JAR}
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Unable to upload the jar file to s3, unable to continue"
+            RETCODE=2
+            NEXTPHASE=0
+        fi
+    fi
+fi
+
+######
 ## PHASE 3 - Upload the update-throughput script
 ######
 if [ $NEXTPHASE -eq 1 ]; then

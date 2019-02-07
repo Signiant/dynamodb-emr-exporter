@@ -131,6 +131,11 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
     table_list = listTables(conn)
     table_desc_list = describeTables(conn, table_list)
 
+    # Set the JarPath and classPath
+    jarPath = s3location.rstrip('/') + '/jar/emr-dynamodb-tools-4.8.0-SNAPSHOT.jar'
+    exportClassPath = "org.apache.hadoop.dynamodb.tools.DynamoDBExport"
+    importClassPath = "org.apache.hadoop.dynamodb.tools.DynamoDBImport"
+
     # Get the path we will use for 'this' backup
     s3ExportPath = generateS3Path(s3location,region,dateStr,appname)
 
@@ -171,7 +176,7 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
         else:
           myLog("Table uses on-demand capacity - no need for spike and reset throughput steps")
 
-        tableExportStep = generateTableExportStep(table['name'],tableS3Path,readtput,region)
+        tableExportStep = generateTableExportStep(table['name'],tableS3Path,readtput,jarPath,exportClassPath)
         exportSteps.append(tableExportStep)
 
         if int(table['read']) > 0:
@@ -179,7 +184,7 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
                 tputResetStep = generateThroughputUpdateStep(table['name'], "Reset", s3ScriptPath, table['read'], autoscale_min_reset_read_capacity, table['write'], region)
                 exportSteps.append(tputResetStep)
 
-        tableImportStep = generateTableImportStep(table['name'],tableS3Path,writetput,impregion)
+        tableImportStep = generateTableImportStep(table['name'],tableS3Path,writetput,jarPath,importClassPath)
         importSteps.append(tableImportStep)
 
     # Now we can write out the import and export steps files
@@ -230,15 +235,23 @@ def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, autoscal
 ###########
 ## Add a JSON entry for a single table export step
 ###########
-def generateTableExportStep(tableName,s3Path,readtput,endpoint):
+def generateTableExportStep(tableName,s3Path,readtput,jarPath=None,classPath=None):
   myLog("addTableExportStep %s" % tableName)
+
+  if not jarPath:
+      # Default JAR
+      jarPath = "s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar"
+
+  if not classPath:
+    # Default ClassPath
+    classPath = "org.apache.hadoop.dynamodb.tools.DynamoDbExport"
 
   tableExportDict = {}
   tableExportDict = {"Name": "Export Table:" + tableName,
                      "ActionOnFailure": "CONTINUE",
                      "Type": "CUSTOM_JAR",
-                     "Jar":"s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar",
-                     "Args":["org.apache.hadoop.dynamodb.tools.DynamoDbExport",
+                     "Jar": jarPath,
+                     "Args":[classPath,
                              s3Path,
                              tableName,
                              readtput,
@@ -251,15 +264,23 @@ def generateTableExportStep(tableName,s3Path,readtput,endpoint):
 ###########
 ## Add a JSON entry for a single table import step
 ###########
-def generateTableImportStep(tableName,s3Path,writetput,impregion):
+def generateTableImportStep(tableName,s3Path,writetput,jarPath=None,classPath=None):
   myLog("addTableImportStep %s" % tableName)
+
+  if not jarPath:
+      # Default JAR
+      jarPath = "s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar"
+
+  if not classPath:
+    # Default ClassPath
+    classPath = "org.apache.hadoop.dynamodb.tools.DynamoDbImport"
 
   tableImportDict = {}
   tableImportDict = {"Name": "Import Table:" + tableName,
                      "ActionOnFailure": "CONTINUE",
                      "Type": "CUSTOM_JAR",
-                     "Jar":"s3://dynamodb-emr-us-east-1/emr-ddb-storage-handler/2.1.0/emr-ddb-2.1.0.jar",
-                     "Args":["org.apache.hadoop.dynamodb.tools.DynamoDbImport",
+                     "Jar":jarPath,
+                     "Args":[classPath,
                              s3Path,
                              tableName,
                              writetput
@@ -286,6 +307,7 @@ def describeTables(conn, table_list):
 
     for table in table_list:
         table_desc = conn.describe_table(TableName=table)
+        # myLog("Table details: %s" % str(table_desc))
         table_return = dict()
         table_return['name'] = table
         table_return['read'] = str(table_desc['Table']['ProvisionedThroughput']['ReadCapacityUnits'])
