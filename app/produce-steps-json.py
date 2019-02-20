@@ -112,6 +112,7 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
 
   # Have we been given an excludes file?  If so, read it.  Any tables in here
   # will not have export steps generated for them
+  exclude_table_list = []
   if excludes:
       myLog("excludes specified - reading " + excludes)
 
@@ -148,8 +149,7 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
     # Now process them, ignoring any that don't match our filter
     for table in table_desc_list:
       if filter in table['name']:
-
-        if table['name'] in exclude_table_list:
+        if excludes and table['name'] in exclude_table_list:
           myLog("Table " + table['name'] + " is in the exclude list - skipping")
           continue
         else:
@@ -199,35 +199,25 @@ def main(region,filter,destination,impregion,writetput,readtput, spikedread, s3l
 ###########
 ## Add a JSON entry for a single table throughput update step
 ###########
-def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, autoscale_min_throughput,writetput, region):
+def generateThroughputUpdateStep(tableName, stepName, s3Path, readtput, autoscale_min_throughput, writetput, region):
     myLog("addThroughputUpdateStep (%s) %s" % (stepName, tableName))
 
     tputUpdateDict = {}
-
+    args = [s3Path, region, tableName, str(readtput), str(writetput)]
     if autoscale_min_throughput:
+        args.append(str(autoscale_min_throughput))
         tputUpdateDict = { "Name": stepName + " Throughput: " + tableName,
                             "ActionOnFailure": "CONTINUE",
                             "Type": "CUSTOM_JAR",
                             "Jar": "s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
-                            "Args": [s3Path,
-                                region,
-                                tableName,
-                                str(readtput),
-                                str(writetput),
-                                str(autoscale_min_throughput)
-                                ]
+                            "Args": args
                         }
     else:
         tputUpdateDict = { "Name": stepName + " Throughput: " + tableName,
                             "ActionOnFailure": "CONTINUE",
                             "Type": "CUSTOM_JAR",
                             "Jar": "s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
-                            "Args": [s3Path,
-                                region,
-                                tableName,
-                                str(readtput),
-                                str(writetput)
-                                ]
+                            "Args": args
                         }
 
     return tputUpdateDict
@@ -247,15 +237,12 @@ def generateTableExportStep(tableName,s3Path,readtput,jarPath=None,classPath=Non
     classPath = "org.apache.hadoop.dynamodb.tools.DynamoDbExport"
 
   tableExportDict = {}
+  args = [classPath, s3Path, tableName, readtput]
   tableExportDict = {"Name": "Export Table:" + tableName,
                      "ActionOnFailure": "CONTINUE",
                      "Type": "CUSTOM_JAR",
                      "Jar": jarPath,
-                     "Args":[classPath,
-                             s3Path,
-                             tableName,
-                             readtput,
-                            ]
+                     "Args": args
                     }
 
   return tableExportDict
