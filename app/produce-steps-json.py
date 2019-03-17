@@ -118,25 +118,33 @@ def main(region, filter, destination, writetput, readtput,
             myLog("Unable to open " + excludes + " for reading")
 
     if conn:
-        myLog("connected to dynamodb (region: %s)" % region)
-        myLog("exporting all tables where table name contains %s " % filter)
+        myLog("Connected to dynamodb (region: %s)" % region)
+
+        # Get the path we will use for 'this' backup
+        s3ExportPath = generateS3Path(s3location, region, dateStr, appname)
+
+        # Get the path to the update-throughput script
+        s3ScriptPath = s3location.rstrip('/') + "/scripts/update-throughput.sh"
+
+        S3PathFilename = destination + "/s3path.info"
+        writeFile(s3ExportPath, S3PathFilename)
 
         # get a list of all tables in the region
         table_list = listTables(conn)
         # print('Table list:\n%s' % json.dumps(table_list, indent=4))
 
+        myLog("Exporting all tables where table name contains %s " % filter)
+
         filtered_list = [x for x in table_list if filter in x]
         # print("Filtered list:\n" + json.dumps(filtered_list, indent=4))
 
-        # TODO: Print out excluded list?
+        myLog('Excluding any tables in the following list:\n%s' % json.dumps(exclude_table_list, indent=4))
 
-        filtered_excluded_list = [
-            x for x in filtered_list if x not in exclude_table_list]
+        filtered_excluded_list = [x for x in filtered_list if x not in exclude_table_list]
         # print("Filtered and Excluded list:\n" + json.dumps(filtered_excluded_list, indent=4))
 
-        if clusters > 1:
-            myLog('Asked to break list of tables up into %s clusters' % str(clusters))
-            table_list_list = chunkIt(filtered_excluded_list, clusters)
+        myLog('Asked to break list of tables up into %s clusters' % str(clusters))
+        table_list_list = chunkIt(filtered_excluded_list, clusters)
 
         myLog('Broke list of tables up into the following clusters:\n%s' % json.dumps(table_list_list, indent=4))
 
@@ -150,17 +158,6 @@ def main(region, filter, destination, writetput, readtput,
 
             table_desc_list = describeTables(conn, chunk)
 
-            # Get the path we will use for 'this' backup
-            s3ExportPath = generateS3Path(s3location, region, dateStr, appname)
-
-            # Get the path to the update-throughput script
-            s3ScriptPath = s3location.rstrip(
-                '/') + "/scripts/update-throughput.sh"
-
-            S3PathFilename = destination + "/s3path.info"
-            writeFile(s3ExportPath, S3PathFilename)
-
-            # Now process them, ignoring any that don't match our filter
             for table in table_desc_list:
                 myLog(
                     "Generating EMR export JSON for table: [%s]" %
@@ -225,13 +222,11 @@ def main(region, filter, destination, writetput, readtput,
 
             # Now we can write out the import and export steps files
             exportJSON = json.dumps(exportSteps, indent=4)
-            exportJSONFilename = "%s/exportSteps_%02d.json" % (
-                destination, cluster_number)
+            exportJSONFilename = "%s/exportSteps_%02d.json" % (destination, cluster_number)
             writeFile(exportJSON, exportJSONFilename)
 
             importJSON = json.dumps(importSteps, indent=4)
-            importJSONFilename = "%s/importSteps_%02d.json" % (
-                destination, cluster_number)
+            importJSONFilename = "%s/importSteps_%02d.json" % (destination, cluster_number)
             writeFile(importJSON, importJSONFilename)
             cluster_number += 1
 
@@ -299,7 +294,6 @@ def generateTableExportStep(
         # Default ClassPath
         classPath = "org.apache.hadoop.dynamodb.tools.DynamoDbExport"
 
-    tableExportDict = {}
     tableExportDict = {"Name": "Export Table:" + tableName,
                        "ActionOnFailure": "CONTINUE",
                        "Type": "CUSTOM_JAR",
