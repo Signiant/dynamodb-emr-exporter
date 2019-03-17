@@ -481,6 +481,8 @@ if [ $NEXTPHASE -eq 1 ]; then
                     logMsg "No S3 base location for this backup specified - unable to copy steps files to S3"
             fi
 
+            logMsg "DynamoDB Export SUCCESSFUL for $APPNAME"
+
             RETCODE=0
         else
             logMsg "Cluster ERROR"
@@ -490,6 +492,8 @@ if [ $NEXTPHASE -eq 1 ]; then
 
             logMsg "Writing the BACKUP_COMPLETE_FAILED file for this backup"
             aws s3 cp ${BACKUP_COMPLETE_FAILED_LOCK_LOCAL_FILE} ${S3_BACKUP_BASE}/${BACKUP_COMPLETE_FAILED_LOCK_NAME}
+
+            logMsg "DynamoDB Export FAILED for $APPNAME"
 
             RETCODE=4
         fi
