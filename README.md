@@ -23,8 +23,8 @@ docker run \
     read_throughput_percentage \
     s3_location \
     export_region \
-    import_region \
-    spiked_throughput
+    spiked_throughput \
+    number_of_clusters
 ```
 
 Where
@@ -35,8 +35,8 @@ Where
 * _**read_throughput_percentage**_ is the percent of provisioned read throughput to use (eg 0.45 will use 45% of the provisioned read throughput)
 * _**S3_location**_ is a base S3 location to store the exports and all logs (ie. s3://mybucket/myfolder)
 * _**export_region**_ is the AWS region where the tables to export exist
-* _**import_region**_ is the AWS region where you expect to import the tables (the import steps are pre-generated at export time)
 * _**spiked_throughput**_ is an optional provisioned read throughput value to spike the read throughtput to on the table being backed up
+* _**number_of_clusters**_ is an optional value to specify how many clusters to use (default 1)
 
 An optional environment variable _**DEBUG_OUTPUT**_ can also be specified to the container which will run the underlying script with debug enabled
 
