@@ -118,8 +118,7 @@ def main(region, filter, destination, writetput, readtput,
             myLog("Unable to open " + excludes + " for reading")
 
     if conn:
-        myLog("connected to dynamodb (region: %s)" % region)
-        myLog("exporting all tables where table name contains %s " % filter)
+        myLog("Connected to dynamodb (region: %s)" % region)
 
         # Set the JarPath and classPath
         jarPath = s3location.rstrip('/') + '/jar/emr-dynamodb-tools-4.8.0-SNAPSHOT.jar'
@@ -139,10 +138,12 @@ def main(region, filter, destination, writetput, readtput,
         table_list = listTables(conn)
         # print('Table list:\n%s' % json.dumps(table_list, indent=4))
 
+        myLog("Exporting all tables where table name contains %s " % filter)
+
         filtered_list = [x for x in table_list if filter in x]
         # print("Filtered list:\n" + json.dumps(filtered_list, indent=4))
 
-        # TODO: Print out excluded list?
+        myLog('Excluding any tables in the following list:\n%s' % json.dumps(exclude_table_list, indent=4))
 
         filtered_excluded_list = [x for x in filtered_list if x not in exclude_table_list]
         # print("Filtered and Excluded list:\n" + json.dumps(filtered_excluded_list, indent=4))
