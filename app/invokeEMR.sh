@@ -67,6 +67,13 @@ pollClusters()
     ALL_COMPLETE=0
     ERRORS=0
 
+    cluster_number=0
+    for cluster in "${CLUSTERS[@]}"
+    do
+        logMsg "polling cluster NAME:${cluster} ID:${CLUSTER_IDS[$cluster_number]} for status in region ${REGION}"
+        cluster_number=$((cluster_number+1))
+    done
+
     while [ $ALL_COMPLETE -ne 1 ]
     do
         cluster_number=0
@@ -74,7 +81,6 @@ pollClusters()
         do
             if [ ${CLUSTERS_COMPLETE[$cluster_number]} -ne 1 ]; then
                 # If the cluster is not yet complete
-                logMsg "polling cluster NAME:${cluster} ID ${CLUSTER_IDS[$cluster_number]} for status in region ${REGION}"
                 CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id ${CLUSTER_IDS[$cluster_number]} --region $REGION --output text --query 'Cluster.Status.State')
 
                 if [ "${CLUSTER_STATUS}" == "TERMINATED" ]; then
@@ -347,7 +353,7 @@ if [ $NEXTPHASE -eq 1 ]; then
                             logMsg "Creating new EMR Cluster NAME:${cluster} Attempt ${CLUSTER_ATTEMPT[$cluster_number]} of ${RETRIES}"
 
                             CLUSTERID=$(aws emr create-cluster --name "${cluster}"                                        \
-                                        --release-label "emr-5.20.0"                                                           \
+                                        --release-label "emr-5.22.0"                                                           \
                                         --service-role "EMR_DefaultRole"                                                       \
                                         --security-configuration "dynamodb-backups"                                            \
                                         --tags Name=${CLUSTER_NAME} signiant:product=devops signiant:email=devops@signiant.com \
