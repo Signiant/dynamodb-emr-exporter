@@ -121,7 +121,8 @@ def main(region, filter, destination, writetput, readtput,
         myLog("Connected to dynamodb (region: %s)" % region)
 
         # Set the JarPath and classPath
-        jarPath = s3location.rstrip('/') + '/jar/emr-dynamodb-tools-4.8.0-SNAPSHOT.jar'
+        # jarPath = s3location.rstrip('/') + '/jar/emr-dynamodb-tools-4.8.0-SNAPSHOT.jar'
+        jarPath = '/usr/share/aws/emr/ddb/lib/emr-dynamodb-tools.jar'
         exportClassPath = "org.apache.hadoop.dynamodb.tools.DynamoDBExport"
         importClassPath = "org.apache.hadoop.dynamodb.tools.DynamoDBImport"
 
@@ -153,10 +154,23 @@ def main(region, filter, destination, writetput, readtput,
 
         myLog('Broke list of tables up into the following clusters:\n%s' % json.dumps(table_list_list, indent=4))
 
+        # TODO: Remove
+        lsFsScriptPath = s3location.rstrip('/') + "/scripts/ls_given_path.sh"
+
         cluster_number = 1
         for chunk in table_list_list:
             exportSteps = []
             importSteps = []
+
+            # TODO: Remove
+            listFileSystemStep = {
+                "Name": 'ListLocalFileSystem',
+                "ActionOnFailure": "CONTINUE",
+                "Type": "CUSTOM_JAR",
+                "Jar": "s3://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar",
+                "Args": [lsFsScriptPath,
+                         '/usr/share/aws/emr/ddb/lib'
+                         ]}
 
             # Process this chunk of tables
             myLog("Creating steps for Cluster %02d" % int(cluster_number))

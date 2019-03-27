@@ -28,6 +28,7 @@ INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 COMMON_JSON=${INSTALL_DIR}/common-json
 STEP_PRODUCER=${INSTALL_DIR}/produce-steps-json.py
 THROUGHPUT_SCRIPT=${INSTALL_DIR}/update-throughput.sh
+LS_GIVEN_PATH=${INSTALL_DIR}/ls_given_path.sh
 JSON_OUTPUT_DIR=${INSTALL_DIR}/${TABLE_FILTER}
 NEXTPHASE=0
 RETCODE=0
@@ -202,24 +203,30 @@ if [ $NEXTPHASE -eq 1 ]; then
     fi
 fi
 
-######
-## PHASE 2.5 - Upload the jar file
-######
-if [ $NEXTPHASE -eq 1 ]; then
-    BUNDLED_JAR=emr-dynamodb-tools-4.8.0-SNAPSHOT.jar
-    BUNDLED_JAR_PATH=${INSTALL_DIR}/jar/${BUNDLED_JAR}
-    if [ ! -e "${BUNDLED_JAR_PATH}" ]; then
-        logMsg "The jar file is missing - unable to continue"
-        NEXTPHASE=0
-        RETCODE=2
-    else
-        aws s3 cp ${BUNDLED_JAR_PATH} ${S3LOCATION}/jar/${BUNDLED_JAR}
-        if [ $? -ne 0 ]; then
-            echo "ERROR: Unable to upload the jar file to s3, unable to continue"
-            RETCODE=2
-            NEXTPHASE=0
-        fi
-    fi
+# TODO: REMOVE
+#######
+### PHASE 2.5 - Upload the jar file
+#######
+#if [ $NEXTPHASE -eq 1 ]; then
+#    BUNDLED_JAR=emr-dynamodb-tools-4.8.0-SNAPSHOT.jar
+#    BUNDLED_JAR_PATH=${INSTALL_DIR}/jar/${BUNDLED_JAR}
+#    if [ ! -e "${BUNDLED_JAR_PATH}" ]; then
+#        logMsg "The jar file is missing - unable to continue"
+#        NEXTPHASE=0
+#        RETCODE=2
+#    else
+#        aws s3 cp ${BUNDLED_JAR_PATH} ${S3LOCATION}/jar/${BUNDLED_JAR}
+#        if [ $? -ne 0 ]; then
+#            echo "ERROR: Unable to upload the jar file to s3, unable to continue"
+#            RETCODE=2
+#            NEXTPHASE=0
+#        fi
+#    fi
+#fi
+# TODO: Remove this
+aws s3 cp $LS_GIVEN_PATH ${S3LOCATION}/scripts/ls_given_path.sh
+if [ $? -ne 0 ]; then
+    logMsg "ERROR: Unable to upload the ls_given_path script to s3, unable to continue"
 fi
 
 ######
