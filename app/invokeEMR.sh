@@ -65,7 +65,7 @@ pollClusters()
         CLUSTERS_COMPLETE+=(0)
     done
     ALL_COMPLETE=0
-    ERRORS=0
+    OVERALL_STATUS=0
 
     cluster_number=0
     for cluster in "${CLUSTERS[@]}"
@@ -79,6 +79,7 @@ pollClusters()
         cluster_number=0
         for cluster in "${CLUSTERS[@]}"
         do
+            ERRORS=0
             if [ ${CLUSTERS_COMPLETE[$cluster_number]} -ne 1 ]; then
                 # If the cluster is not yet complete
                 CLUSTER_STATUS=$(aws emr describe-cluster --cluster-id ${CLUSTER_IDS[$cluster_number]} --region $REGION --output text --query 'Cluster.Status.State')
@@ -87,7 +88,7 @@ pollClusters()
                     # We now need to check if there were step errors
                     STEPS_STATUS=$(aws emr describe-cluster --cluster-id ${CLUSTER_IDS[$cluster_number]} --region $REGION --output text --query 'Cluster.Status.StateChangeReason.Message')
 
-                    if [ "${STEPS_STATUS}" == "Steps completed with errors" ]; then
+                    if [[ "${STEPS_STATUS}" == *"completed with errors"* ]]; then
                         EXPORT_FAILS=$(aws emr list-steps --step-states FAILED --cluster-id ${CLUSTER_IDS[$cluster_number]} --region $REGION --output text --query 'Steps[?starts_with(Name, `Export Table:`) == `true`]|[].Name')
                         if [ ! -z "${EXPORT_FAILS}" ]; then
                             ERRORS=1
@@ -107,6 +108,9 @@ pollClusters()
                 fi
             fi
             cluster_number=$((cluster_number+1))
+            if [ $ERRORS -eq 1 ]; then
+                OVERALL_STATUS=1
+            fi
         done
 
         # Parse the cluster complete values
@@ -124,7 +128,7 @@ pollClusters()
         fi
     done
 
-    return $ERRORS
+    return $OVERALL_STATUS
 }
 
 if [ $# != 6 ] && [ $# != 7 ] && [ $# != 8 ]; then
