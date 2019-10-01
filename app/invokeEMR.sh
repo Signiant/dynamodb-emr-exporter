@@ -128,7 +128,7 @@ pollClusters()
         fi
     done
 
-    return OVERALL_STATUS
+    return $OVERALL_STATUS
 }
 
 if [ $# != 6 ] && [ $# != 7 ] && [ $# != 8 ]; then
