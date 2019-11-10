@@ -89,13 +89,17 @@ pollClusters()
                     STEPS_STATUS=$(aws emr describe-cluster --cluster-id ${CLUSTER_IDS[$cluster_number]} --region $REGION --output text --query 'Cluster.Status.StateChangeReason.Message')
 
                     if [[ "${STEPS_STATUS}" == *"completed with errors"* ]]; then
-                        EXPORT_FAILS=$(aws emr list-steps --step-states FAILED --cluster-id ${CLUSTER_IDS[$cluster_number]} --region $REGION --output text --query 'Steps[?starts_with(Name, `Export Table:`) == `true`]|[].Name')
+                        EXPORT_FAILS=$(aws emr list-steps --step-states FAILED --cluster-id ${CLUSTER_IDS[$cluster_number]} --region $REGION --output text)
                         if [ ! -z "${EXPORT_FAILS}" ]; then
                             ERRORS=1
                             logMsg "Cluster ERROR:task failure NAME:${cluster} ID:${CLUSTER_IDS[$cluster_number]}"
                         else
                             ERRORS=0
                         fi
+                    elif [[ "${STEPS_STATUS}" == *"Terminated by user request"* ]]; then
+                        # If terminated by the user, assume it is NOT complete
+                        ERRORS=1
+                        logMsg "Cluster NAME:${cluster} ID:${CLUSTER_IDS[$cluster_number]} terminated by user request - mark as failed"
                     else
                         ERRORS=0
                         logMsg "Cluster SUCCESS NAME:${cluster} ID:${CLUSTER_IDS[$cluster_number]}"
