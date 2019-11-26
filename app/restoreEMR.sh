@@ -70,7 +70,7 @@ pollCluster()
         return $ERRORS
 }
 
-if [ $# != 6 ]; then
+if [ $# != 5 ]; then
         usage
         exit 1
 fi
@@ -107,13 +107,13 @@ if [ $NEXTPHASE == 1 ]; then
                 logMsg "Creating new EMR Cluster NAME:${CLUSTER_NAME} Attempt ${CURR_ATTEMPT} of ${RETRIES}"
 
                 CLUSTERID=$(aws emr create-cluster --name "${CLUSTER_NAME}"                                        \
-                            --release-label "emr-5.8.0"                                                            \
+                            --release-label "emr-5.28.0"                                                           \
                             --service-role "EMR_DefaultRole"                                                       \
                             --security-configuration "dynamodb-backups"                                            \
                             --tags Name=${CLUSTER_NAME} signiant:product=devops signiant:email=devops@signiant.com \
                             --enable-debugging                                                                     \
                             --log-uri ${S3LOCATION}/emr-logs                                                       \
-                            --configurations file://${JSON_OUTPUT_DIR}/configurations.json                         \
+                            --configurations file://${JSON_INPUT_DIR}/configurations.json                          \
                             --instance-groups file://${JSON_INPUT_DIR}/instance-groups.json                        \
                             --ec2-attributes file://${JSON_INPUT_DIR}/ec2-attributes.json                          \
                             --steps file://${JSON_INPUT_DIR}/importSteps.json                                      \

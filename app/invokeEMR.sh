@@ -361,7 +361,7 @@ if [ $NEXTPHASE -eq 1 ]; then
                             logMsg "Creating new EMR Cluster NAME:${cluster} Attempt ${CLUSTER_ATTEMPT[$cluster_number]} of ${RETRIES}"
 
                             CLUSTERID=$(aws emr create-cluster --name "${cluster}"                                        \
-                                        --release-label "emr-5.22.0"                                                           \
+                                        --release-label "emr-5.28.0"                                                           \
                                         --service-role "EMR_DefaultRole"                                                       \
                                         --security-configuration "dynamodb-backups"                                            \
                                         --tags Name=${CLUSTER_NAME} signiant:product=devops signiant:email=devops@signiant.com \
