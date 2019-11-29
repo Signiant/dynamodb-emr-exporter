@@ -370,9 +370,10 @@ if [ $NEXTPHASE -eq 1 ]; then
                                         --configurations file://${JSON_OUTPUT_DIR}/configurations.json                         \
                                         --instance-groups file://${JSON_OUTPUT_DIR}/instance-groups.json                       \
                                         --ec2-attributes file://${JSON_OUTPUT_DIR}/ec2-attributes.json                         \
-                                        --steps file://${JSON_OUTPUT_DIR}/exportSteps_${zero_pad_cluster_num}.json                                     \
+                                        --steps file://${JSON_OUTPUT_DIR}/exportSteps_${zero_pad_cluster_num}.json             \
                                         --auto-terminate                                                                       \
                                         --visible-to-all-users                                                                 \
+                                        --query 'ClusterId'                                                                    \
                                         --output text                                                                          \
                                         --region ${REGION})
 
