@@ -58,9 +58,9 @@ addSubnetId()
 {
     # First get the availability zone from the ec2-attributes.json file
     az=$(grep "AvailabilityZone" ${JSON_OUTPUT_DIR}/ec2-attributes.json | sed 's/.*: "\(.*\)"/\1/')
-    subnet_id=$(aws ec2 describe-subnets --filters Name=availability-zone,Values=$az Name=tag:Name,Values=PUBLIC --query 'Subnets[].[SubnetId]' --output text)
+    subnet_id=$(aws ec2 describe-subnets --region us-east-1 --filters Name=availability-zone,Values=$az Name=tag:Name,Values=PUBLIC --query 'Subnets[].[SubnetId]' --output text)
     # insert the subnet id into the ec2-attributes.json file
-    sed -i "s/^}/  \"SubnetId\": \"$subnet_id\"\n}/" ec2-attributes.json
+    sed -i "s/^}/  \"SubnetId\": \"$subnet_id\"\n}/" ${JSON_OUTPUT_DIR}/ec2-attributes.json
 }
 
 pollClusters()
