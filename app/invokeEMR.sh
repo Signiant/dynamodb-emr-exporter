@@ -56,11 +56,16 @@ usage()
 
 addSubnetId()
 {
+    jq -h
+    echo "Adding subnet to ec2-attributes"
     # First get the availability zone from the ec2-attributes.json file
     az=$(grep "AvailabilityZone" ${JSON_OUTPUT_DIR}/ec2-attributes.json | sed 's/.*: "\(.*\)"/\1/')
     subnet_id=$(aws ec2 describe-subnets --region us-east-1 --filters Name=availability-zone,Values=$az Name=tag:Name,Values=PUBLIC --query 'Subnets[].[SubnetId]' --output text)
+    # Add a comma to the end of the last line in the json block
+    sed -i '/AvailabilityZone/s/$/,/' ${JSON_OUTPUT_DIR}/ec2-attributes.json
     # insert the subnet id into the ec2-attributes.json file
     sed -i "s/^}/  \"SubnetId\": \"$subnet_id\"\n}/" ${JSON_OUTPUT_DIR}/ec2-attributes.json
+    echo "Added subnet with ID $subnet_id to ec2-attributes"
 }
 
 pollClusters()
