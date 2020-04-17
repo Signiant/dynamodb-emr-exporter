@@ -62,11 +62,9 @@ addSubnetId()
     echo "Availability zone: $az"
     subnet_id=$(aws ec2 describe-subnets --region us-east-1 --filters Name=availability-zone,Values=$az Name=tag:Name,Values=PUBLIC --query 'Subnets[].[SubnetId]' --output text)
     sed -i 's/AvailabilityZone/SubnetId/' ${JSON_OUTPUT_DIR}/ec2-attributes.json
-    sed -i "s/$az/$subnet_id/" ${JSON_OUTPUT_DIR}/ec2-attributes.json
+    sed -i "s/\(^.*Subnet.*\": \"\).*/\1$subnet_id\"/" ${JSON_OUTPUT_DIR}/ec2-attributes.json
     echo "Resulting ec2-attributes.json file:"
     cat ${JSON_OUTPUT_DIR}/ec2-attributes.json
-    # insert the subnet id into the ec2-attributes.json file
-    # sed -i "s/^}/  \"SubnetId\": \"$subnet_id\"\n}/" ${JSON_OUTPUT_DIR}/ec2-attributes.json
     echo "Added subnet with ID $subnet_id to ec2-attributes"
 }
 
