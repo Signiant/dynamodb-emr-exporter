@@ -54,6 +54,15 @@ usage()
     echo "Usage: invokeEMR app_name emr_cluster_name table_filter read_throughput_percentage json_output_directory S3_location export_region [spiked_throughput] [number_of_clusters]"
 }
 
+addSubnetId()
+{
+    # First get the availability zone from the ec2-attributes.json file
+    az=$(grep "AvailabilityZone" ${JSON_OUTPUT_DIR}/ec2-attributes.json | sed 's/.*: "\(.*\)"/\1/')
+    subnet_id=$(aws ec2 describe-subnets --filters Name=availability-zone,Values=$az Name=tag:Name,Values=PUBLIC --query 'Subnets[].[SubnetId]' --output text)
+    # insert the subnet id into the ec2-attributes.json file
+    sed -i "s/^}/  \"SubnetId\": \"$subnet_id\"\n}/" ec2-attributes.json
+}
+
 pollClusters()
 {
     CLUSTER_IDS=$1
@@ -313,6 +322,9 @@ if [ $NEXTPHASE -eq 1 ]; then
     if [ ! -e "${BACKUP_COMPLETE_FAILED_LOCK_LOCAL_FILE}" ]; then
         touch "${BACKUP_COMPLETE_FAILED_LOCK_LOCAL_FILE}"
     fi
+
+    # To make sure we specify the subnet ID when creating the cluster, find it and add it to the ec2-attributes file
+    addSubnetId
 
     # Create and Wait for Clusters to start
 
