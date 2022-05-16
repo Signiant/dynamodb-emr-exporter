@@ -60,7 +60,7 @@ addSubnetId()
     # First get the availability zone from the ec2-attributes.json file
     az=$(grep "AvailabilityZone" ${JSON_OUTPUT_DIR}/ec2-attributes.json | sed 's/.*: "\(.*\)"/\1/')
     echo "Availability zone: $az"
-    subnet_id=$(aws ec2 describe-subnets --region us-east-1 --filters Name=availability-zone,Values=$az Name=tag:Name,Values=PUBLIC --query 'Subnets[].[SubnetId]' --output text)
+    subnet_id=$(aws ec2 describe-subnets --region us-east-1 --filters Name=availability-zone,Values=$az Name=tag:Name,Values=PUBLIC1 --query 'Subnets[].[SubnetId]' --output text)
     sed -i 's/AvailabilityZone/SubnetId/' ${JSON_OUTPUT_DIR}/ec2-attributes.json
     sed -i "s/\(^.*Subnet.*\": \"\).*/\1$subnet_id\"/" ${JSON_OUTPUT_DIR}/ec2-attributes.json
     echo "Resulting ec2-attributes.json file:"
